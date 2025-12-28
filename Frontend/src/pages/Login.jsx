@@ -84,7 +84,7 @@ export default function Login() {
 
       // 🔀 ROLE-BASED REDIRECT
       if (user.role === "admin") navigate("/admin");
-      else if (user.role === "ngo") navigate("/ngo");
+      else if (user.role === "ngo") navigate("/ngo/dashboard");
       else if (user.role === "bloodbank") navigate("/bloodbank");
       else if (user.role === "hospital") navigate("/hospital");
       else navigate("/user");
