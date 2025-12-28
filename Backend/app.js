@@ -5,7 +5,9 @@ import dotenv from "dotenv";
 // Import routes
 import authRoutes from "./routes/AuthRoutes.js";
 import ngoRoutes from "./routes/NgoRoutes.js";
+import donorRoutes from "./routes/DonorRoutes.js";
 import adminAuthRoutes from "./routes/AdminAuthRoutes.js";
+
 
 // Import middleware
 import authMiddleware from "./middleware/auth.middleware.js";
@@ -54,6 +56,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/ngo", authMiddleware, ngoRoutes);
+app.use("/api/donor", donorRoutes);
 
 // ============= ERROR HANDLING =============
 
