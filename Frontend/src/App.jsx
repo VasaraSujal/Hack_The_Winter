@@ -90,8 +90,15 @@ export default function App() {
           <Route path="profile" element={<HospitalProfile />} />
         </Route>
 
-        {/* NGO dashboard with sidebar navigation (public route) */}
-        <Route path="/ngo/dashboard" element={<NgoLayout />}>
+        {/* NGO Dashboard - Protected Routes */}
+        <Route
+          path="/ngo/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["ngo"]}>
+              <NgoLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/ngo/dashboard/overview" replace />} />
           <Route path="overview" element={<NgoOverview />} />
           <Route path="camps" element={<NgoCamps />} />
