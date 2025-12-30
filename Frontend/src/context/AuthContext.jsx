@@ -36,6 +36,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("role", userData.role);
     localStorage.setItem("email", userData.email);
     localStorage.setItem("name", userData.name);
+    
+    // Store organization details
+    if (userData.organizationId) {
+      localStorage.setItem("organizationId", userData.organizationId);
+    }
+    if (userData.organizationType) {
+      localStorage.setItem("organizationType", userData.organizationType);
+    }
+    if (userData.organizationCode) {
+      localStorage.setItem("organizationCode", userData.organizationCode);
+    }
   };
 
   const logout = () => {
@@ -46,6 +57,10 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("role");
     localStorage.removeItem("email");
     localStorage.removeItem("name");
+    localStorage.removeItem("organizationId");
+    localStorage.removeItem("organizationType");
+    localStorage.removeItem("organizationCode");
+    localStorage.removeItem("hospitalId"); // Legacy support
     console.log("[LOGOUT] Cleared localStorage");
     
     // Update state
