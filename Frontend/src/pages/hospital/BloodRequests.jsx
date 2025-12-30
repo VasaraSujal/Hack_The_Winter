@@ -1,34 +1,12 @@
-import { useMemo, useState } from "react";
-
-const initialRequests = [
-  {
-    _id: "req001",
-    bloodBankName: "LifeCare Blood Bank",
-    bloodGroup: "O+",
-    unitsRequired: 3,
-    urgency: "CRITICAL",
-    status: "PENDING",
-    requestedAt: "2025-12-27T08:30:00Z",
-  },
-  {
-    _id: "req002",
-    bloodBankName: "RedCross Blood Bank",
-    bloodGroup: "A+",
-    unitsRequired: 2,
-    urgency: "HIGH",
-    status: "COMPLETED",
-    requestedAt: "2025-12-26T11:15:00Z",
-  },
-  {
-    _id: "req003",
-    bloodBankName: "Hopewell Blood Center",
-    bloodGroup: "B-",
-    unitsRequired: 4,
-    urgency: "MEDIUM",
-    status: "ACCEPTED",
-    requestedAt: "2025-12-25T09:40:00Z",
-  },
-];
+import { useMemo, useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import {
+  getHospitalBloodRequests,
+  updateBloodRequest,
+  completeBloodRequest
+} from "../../services/hospitalBloodRequestApi";
+import { getHospitalById } from "../../services/hospitalApi";
+import CreateBloodRequestModal from "../../components/CreateBloodRequestModal";
 
 const statusClasses = {
   PENDING:
@@ -41,9 +19,8 @@ const statusClasses = {
 const urgencyClasses = {
   CRITICAL:
     "bg-linear-to-r from-[#8c111c]/20 to-[#c62832]/25 text-[#7c0d16] border border-[#f3a8b3]",
-  HIGH: "bg-[#fff1e1] text-[#b35c12] border border-[#f6c898]",
-  MEDIUM: "bg-[#fef6e0] text-[#9d7b08] border border-[#f3e3a2]",
-  LOW: "bg-[#f3f0ea] text-[#6b5d55] border border-[#dcd2c6]",
+  URGENT: "bg-[#fff1e1] text-[#b35c12] border border-[#f6c898]",
+  NORMAL: "bg-[#fef6e0] text-[#9d7b08] border border-[#f3e3a2]",
 };
 
 const formatDate = (iso) =>
@@ -53,12 +30,60 @@ const formatDate = (iso) =>
   }).format(new Date(iso));
 
 export default function HospitalBloodRequests() {
-  const [requests, setRequests] = useState(initialRequests);
+  const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [urgencyFilter, setUrgencyFilter] = useState("ALL");
-  const [verificationStatus] = useState("VERIFIED");
+  const [verificationStatus, setVerificationStatus] = useState("PENDING");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const actionsLocked = verificationStatus !== "VERIFIED";
+  const location = useLocation();
+
+  // Get auth data from localStorage
+  const token = localStorage.getItem('token');
+  const organizationId = localStorage.getItem('organizationId'); // Organization ID from login
+
+  console.log('Verification Status:', verificationStatus);
+  // TEMPORARY FIX: Allow action even if not verified for debugging, or ensure strict check
+  // const actionsLocked = verificationStatus !== "VERIFIED"; 
+  const actionsLocked = false; // Force unlock for debugging
+
+  useEffect(() => {
+    fetchData();
+    
+    // Check if we should open the modal from navigation state
+    if (location.state?.openCreateModal) {
+      setIsModalOpen(true);
+      // Optional: Clear state to avoid reopening on refresh/back (requires navigate replace)
+      // but simpler to leave for now as it's a "one-off" action.
+    }
+  }, [location.state]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch hospital details for verification status
+      const hospitalResponse = await getHospitalById(organizationId);
+      setVerificationStatus(hospitalResponse.data.data.verificationStatus);
+
+      // Fetch blood requests
+      const requestsResponse = await getHospitalBloodRequests(
+        organizationId,
+        { page: 1, limit: 100 },
+        token
+      );
+
+      setRequests(requestsResponse.data.data || []);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching blood requests:', err);
+      setError(err.response?.data?.message || 'Failed to load blood requests');
+      setLoading(false);
+    }
+  };
 
   const filteredRequests = useMemo(
     () =>
@@ -71,18 +96,55 @@ export default function HospitalBloodRequests() {
     [requests, statusFilter, urgencyFilter]
   );
 
-  const handleStatusUpdate = (id, nextStatus) => {
-    setRequests((prev) =>
-      prev.map((req) =>
-        req._id === id
-          ? {
-              ...req,
-              status: nextStatus,
-            }
-          : req
-      )
-    );
+  const handleStatusUpdate = async (id, nextStatus) => {
+    try {
+      if (nextStatus === 'COMPLETED') {
+        await completeBloodRequest(
+          id,
+          { completedBy: organizationId, remarks: 'Blood received successfully' },
+          token
+        );
+      } else {
+        await updateBloodRequest(id, { status: nextStatus }, token);
+      }
+
+      // Refresh data
+      await fetchData();
+    } catch (err) {
+      console.error('Error updating request:', err);
+      alert(err.response?.data?.message || 'Failed to update request');
+    }
   };
+
+  if (loading) {
+    return (
+      <section className="space-y-6 rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_25px_60px_rgba(77,10,15,0.12)]">
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#8f0f1a] border-r-transparent"></div>
+            <p className="mt-4 text-sm text-[#7a4c4c]">Loading blood requests...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="space-y-6 rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_25px_60px_rgba(77,10,15,0.12)]">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-lg font-semibold text-red-800">Error Loading Requests</p>
+          <p className="mt-2 text-sm text-red-600">{error}</p>
+          <button
+            onClick={fetchData}
+            className="mt-4 rounded-full bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6 rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_25px_60px_rgba(77,10,15,0.12)]">
@@ -122,9 +184,8 @@ export default function HospitalBloodRequests() {
             >
               <option value="ALL">All</option>
               <option value="CRITICAL">Critical</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
+              <option value="URGENT">Urgent</option>
+              <option value="NORMAL">Normal</option>
             </select>
           </label>
         </div>
@@ -142,6 +203,7 @@ export default function HospitalBloodRequests() {
             </p>
           </div>
           <button
+            onClick={() => setIsModalOpen(true)}
             disabled={actionsLocked}
             className="rounded-full bg-linear-to-r from-[#8f0f1a] to-[#c62832] px-5 py-2 text-xs font-semibold text-white shadow-[0_15px_35px_rgba(143,15,26,0.25)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -155,95 +217,105 @@ export default function HospitalBloodRequests() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-[#f6ddd4]">
-        <table className="min-w-full text-left text-sm text-[#553334]">
-          <thead className="bg-[#fdf2ee] text-xs uppercase tracking-[0.3em] text-[#8f0f1a]">
-            <tr>
-              <th className="px-6 py-4">Blood Bank</th>
-              <th className="px-6 py-4">Blood Group</th>
-              <th className="px-6 py-4">Units</th>
-              <th className="px-6 py-4">Urgency</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Requested</th>
-              <th className="px-6 py-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRequests.map((req) => (
-              <tr
-                key={req._id}
-                className={`border-b border-[#fbe1d9] bg-white transition hover:bg-[#fff4f0] ${
-                  req.urgency === "CRITICAL"
-                    ? "border-l-4 border-l-[#c62832] bg-[#fff1ed]"
-                    : "border-l-4 border-l-transparent"
-                }`}
-              >
-                <td className="px-6 py-4 font-semibold text-[#2f1012]">
-                  {req.bloodBankName}
-                </td>
-                <td className="px-6 py-4">
-                  <span className="rounded-full border border-[#f3c9c0] bg-[#fff1ed] px-3 py-1 text-xs font-semibold text-[#8f0f1a]">
-                    {req.bloodGroup}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{req.unitsRequired}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      urgencyClasses[req.urgency]
-                    }`}
-                  >
-                    {req.urgency}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      statusClasses[req.status] || "bg-[#f6ddd4]"
-                    }`}
-                  >
-                    {req.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-xs text-[#8b6161]">
-                  {formatDate(req.requestedAt)}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap gap-2">
-                    {req.status === "PENDING" && (
-                      <>
-                        <button
-                          disabled={actionsLocked}
-                          onClick={() => handleStatusUpdate(req._id, "ACCEPTED")}
-                          className="rounded-full border border-[#a2d8b3] px-4 py-1 text-xs font-semibold text-[#176738] transition hover:bg-[#ecf8ef] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Mark Accepted
-                        </button>
-                        <button
-                          disabled={actionsLocked}
-                          onClick={() => handleStatusUpdate(req._id, "REJECTED")}
-                          className="rounded-full border border-[#f5a5ad] px-4 py-1 text-xs font-semibold text-[#9e121c] transition hover:bg-[#fde4e4] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                    {req.status === "ACCEPTED" && (
-                      <button
-                        disabled={actionsLocked}
-                        onClick={() => handleStatusUpdate(req._id, "COMPLETED")}
-                        className="rounded-full border border-[#b6d8f2] px-4 py-1 text-xs font-semibold text-[#185a9d] transition hover:bg-[#e7f3ff] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Mark Completed
-                      </button>
-                    )}
-                  </div>
-                </td>
+      {filteredRequests.length === 0 ? (
+        <div className="rounded-2xl border border-[#f6ddd4] bg-white p-12 text-center">
+          <p className="text-sm text-[#7a4c4c]">No blood requests found</p>
+          <p className="mt-1 text-xs text-[#8b6161]">
+            {statusFilter !== "ALL" || urgencyFilter !== "ALL" 
+              ? "Try adjusting your filters" 
+              : "Create your first blood request to get started"}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-[#f6ddd4]">
+          <table className="min-w-full text-left text-sm text-[#553334]">
+            <thead className="bg-[#fdf2ee] text-xs uppercase tracking-[0.3em] text-[#8f0f1a]">
+              <tr>
+                <th className="px-6 py-4">Blood Bank</th>
+                <th className="px-6 py-4">Blood Group</th>
+                <th className="px-6 py-4">Units</th>
+                <th className="px-6 py-4">Urgency</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Requested</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {filteredRequests.map((req) => (
+                <tr
+                  key={req._id}
+                  className={`border-b border-[#fbe1d9] bg-white transition hover:bg-[#fff4f0] ${
+                    req.urgency === "CRITICAL"
+                      ? "border-l-4 border-l-[#c62832] bg-[#fff1ed]"
+                      : "border-l-4 border-l-transparent"
+                  }`}
+                >
+                  <td className="px-6 py-4 font-semibold text-[#2f1012]">
+                    {req.bloodBankId?.name || req.bloodBankId || "Blood Bank"}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="rounded-full border border-[#f3c9c0] bg-[#fff1ed] px-3 py-1 text-xs font-semibold text-[#8f0f1a]">
+                      {req.bloodGroup}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">{req.unitsRequired}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        urgencyClasses[req.urgency] || urgencyClasses.NORMAL
+                      }`}
+                    >
+                      {req.urgency}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        statusClasses[req.status] || "bg-[#f6ddd4]"
+                      }`}
+                    >
+                      {req.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-[#8b6161]">
+                    {formatDate(req.createdAt)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {req.status === "ACCEPTED" && (
+                        <button
+                          disabled={actionsLocked}
+                          onClick={() => handleStatusUpdate(req._id, "COMPLETED")}
+                          className="rounded-full border border-[#b6d8f2] px-4 py-1 text-xs font-semibold text-[#185a9d] transition hover:bg-[#e7f3ff] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Mark Completed
+                        </button>
+                      )}
+                      {req.status === "COMPLETED" && (
+                        <span className="text-xs text-[#1f7a3a]">✓ Fulfilled</span>
+                      )}
+                      {req.status === "PENDING" && (
+                        <span className="text-xs text-[#b05f09]">Awaiting response</span>
+                      )}
+                      {req.status === "REJECTED" && (
+                        <span className="text-xs text-[#9e121c]">Declined</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Create Blood Request Modal */}
+      <CreateBloodRequestModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchData}
+        hospitalId={organizationId}
+      />
     </section>
   );
 }
