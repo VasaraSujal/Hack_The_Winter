@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getHospitalById } from "../services/hospitalApi";
 
 const navItems = [
   { label: "Dashboard Overview", path: "/hospital/overview" },
@@ -10,13 +11,6 @@ const navItems = [
   { label: "Profile & Settings", path: "/hospital/profile" },
 ];
 
-const hospitalSnapshot = {
-  name: "City Care Hospital",
-  registrationNumber: "HOSP-GJ-2020-8899",
-  city: "Ahmedabad",
-  verificationStatus: "VERIFIED",
-};
-
 const statusBadgeStyles = {
   VERIFIED:
     "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
@@ -24,12 +18,36 @@ const statusBadgeStyles = {
     "bg-[#fff3e4] text-[#b05f09] border border-[#f0c18c] shadow-[0_3px_12px_rgba(219,149,58,0.2)]",
   SUSPENDED:
     "bg-[#fde4e4] text-[#9e121c] border border-[#f5a5ad] shadow-[0_3px_12px_rgba(181,39,57,0.25)]",
+  APPROVED:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
 };
 
 export default function HospitalLayout() {
   const location = useLocation();
   const { logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hospital, setHospital] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch hospital data from backend
+  useEffect(() => {
+    const fetchHospitalData = async () => {
+      try {
+        const organizationId = localStorage.getItem('organizationId');
+        if (organizationId) {
+          const response = await getHospitalById(organizationId);
+          setHospital(response.data.data);
+          console.log('[LAYOUT] Hospital data loaded:', response.data.data.name);
+        }
+      } catch (error) {
+        console.error('[LAYOUT] Error fetching hospital:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHospitalData();
+  }, []);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -97,19 +115,21 @@ export default function HospitalLayout() {
                 </button>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-[#8f0f1a] font-medium">
-                    {hospitalSnapshot.city}
+                    {loading ? 'Loading...' : (hospital?.city || 'City')}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-[#300e11]">
-                      {hospitalSnapshot.name}
+                      {loading ? 'Loading...' : (hospital?.name || 'Hospital')}
                     </h2>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        statusBadgeStyles[hospitalSnapshot.verificationStatus]
-                      }`}
-                    >
-                      {hospitalSnapshot.verificationStatus}
-                    </span>
+                    {hospital && (
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          statusBadgeStyles[hospital.verificationStatus] || statusBadgeStyles.PENDING
+                        }`}
+                      >
+                        {hospital.verificationStatus}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-[#7a4c4c] mt-1">
                     Smart Emergency Blood Network • Hospital Role
