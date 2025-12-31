@@ -106,3 +106,15 @@ export const deleteSlot = (slotId) => {
 export const getNgoDonors = () => {
   return axios.get(`${API_BASE}/ngo/donors`, getAuthHeaders());
 };
+
+// ============= DONOR SEARCH ENDPOINTS (NGO) =============
+
+/**
+ * Search donors by city
+ * GET /api/ngo/donors/search?city=cityName
+ * Protected - requires NGO token
+ */
+export const searchDonorsByCity = (city) => {
+  return axios.get(`${API_BASE}/ngo/donors/search?city=${encodeURIComponent(city)}`, getAuthHeaders());
+};
+
