@@ -41,6 +41,13 @@ router.get("/", HospitalController.getAllHospitals);
 router.get("/nearby", HospitalController.getNearbyHospitals);
 
 /**
+ * @route   GET /api/hospitals/blood/search
+ * @desc    Search blood availability across organizations
+ * @access  Public
+ */
+router.get("/blood/search", HospitalController.searchBloodAvailability);
+
+/**
  * @route   GET /api/hospitals/:id
  * @desc    Get hospital by ID
  * @access  Public
