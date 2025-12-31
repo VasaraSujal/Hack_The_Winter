@@ -83,9 +83,28 @@ export const ngoService = {
   
   getNGOByCode: (code) => adminAPI.get(`/admin/ngos/code/${code}`),
   
-  activateNGO: (id) => adminAPI.post(`/admin/ngos/${id}/activate`),
+  activateNGO: (id, reason = '') => adminAPI.post(`/admin/ngos/${id}/activate`, { reason }),
   
-  deactivateNGO: (id) => adminAPI.post(`/admin/ngos/${id}/deactivate`),
+  deactivateNGO: (id, reason = '') => adminAPI.post(`/admin/ngos/${id}/deactivate`, { reason: reason || 'Deactivated by admin' }),
+  
+  approveNGO: (id) => {
+    // Get NGO details first to get organizationCode
+    return adminAPI.get(`/admin/ngos/id/${id}`).then(res => {
+      const organizationCode = res.data.data.organizationCode;
+      return adminAPI.post(`/admin/approvals/approve`, { organizationCode });
+    });
+  },
+  
+  rejectNGO: (id) => {
+    // Get NGO details first to get organizationCode
+    return adminAPI.get(`/admin/ngos/id/${id}`).then(res => {
+      const organizationCode = res.data.data.organizationCode;
+      return adminAPI.post(`/admin/approvals/reject`, { 
+        organizationCode,
+        rejectionReason: 'Rejected by admin'
+      });
+    });
+  },
   
   updateNGO: (id, data) => adminAPI.put(`/admin/ngos/${id}`, data),
 };

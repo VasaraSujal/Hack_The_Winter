@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import { ngoService } from '../../services/adminService';
-import { Eye, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ngoService } from '../../services/adminService';
 
 export default function NGOManagement() {
+  const navigate = useNavigate();
   const [ngos, setNgos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedNgo, setSelectedNgo] = useState(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const searchTimeoutRef = useRef(null);
   const [filters, setFilters] = useState({
     status: '',
     city: '',
@@ -20,11 +22,50 @@ export default function NGOManagement() {
     fetchNGOs();
   }, [filters]);
 
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      // Reset to page 1 on new search
+      if (searchTerm.trim()) {
+        setFilters(prev => ({ ...prev, page: 1, limit: 100 })); // Get more results for search
+      } else {
+        setFilters(prev => ({ ...prev, page: 1, limit: 10 })); // Reset to normal pagination
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchTerm]);
+
   const fetchNGOs = async () => {
     try {
       setLoading(true);
       const response = await ngoService.getAllNGOs(filters);
-      setNgos(response.data.data.ngos || []);
+      let fetchedNgos = response.data.data.ngos || [];
+      
+      // Add isActive property based on status for consistency
+      fetchedNgos = fetchedNgos.map((ngo) => ({
+        ...ngo,
+        isActive: ngo.status === 'APPROVED'
+      }));
+      
+      // Client-side filtering for search term
+      if (searchTerm.trim()) {
+        const lowerSearch = searchTerm.toLowerCase();
+        fetchedNgos = fetchedNgos.filter((ngo) =>
+          ngo.name?.toLowerCase().includes(lowerSearch) ||
+          ngo.email?.toLowerCase().includes(lowerSearch) ||
+          ngo.organizationCode?.toLowerCase().includes(lowerSearch) ||
+          ngo.city?.toLowerCase().includes(lowerSearch) ||
+          ngo.phone?.includes(lowerSearch)
+        );
+      }
+      
+      setNgos(fetchedNgos);
       setPagination(response.data.data.pagination || {});
     } catch (error) {
       toast.error('Failed to fetch NGOs');
@@ -34,34 +75,8 @@ export default function NGOManagement() {
     }
   };
 
-  const handleActivate = async (ngoId) => {
-    try {
-      await ngoService.activateNGO(ngoId);
-      toast.success('NGO activated successfully');
-      fetchNGOs();
-    } catch (error) {
-      toast.error('Failed to activate NGO');
-    }
-  };
-
-  const handleDeactivate = async (ngoId) => {
-    try {
-      await ngoService.deactivateNGO(ngoId);
-      toast.success('NGO deactivated successfully');
-      fetchNGOs();
-    } catch (error) {
-      toast.error('Failed to deactivate NGO');
-    }
-  };
-
-  const viewDetails = async (ngoId) => {
-    try {
-      const response = await ngoService.getNGOById(ngoId);
-      setSelectedNgo(response.data.data);
-      setDetailsOpen(true);
-    } catch (error) {
-      toast.error('Failed to fetch NGO details');
-    }
+  const viewDetails = (ngoId) => {
+    navigate(`/superadmin/ngo/${ngoId}`);
   };
 
   const getStatusBadge = (status) => {
@@ -106,16 +121,17 @@ export default function NGOManagement() {
 
           <input
             type="text"
-            placeholder="Search by city..."
-            value={filters.city}
-            onChange={(e) =>
-              setFilters({ ...filters, city: e.target.value, page: 1 })
-            }
+            placeholder="Search by NGO name, email or code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
 
           <button
-            onClick={() => setFilters({ status: '', city: '', page: 1, limit: 10 })}
+            onClick={() => {
+              setSearchTerm('');
+              setFilters({ status: '', city: '', page: 1, limit: 10 });
+            }}
             className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
           >
             Reset Filters
@@ -156,6 +172,9 @@ export default function NGOManagement() {
                     Active
                   </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Donors
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                     Actions
                   </th>
                 </tr>
@@ -190,6 +209,9 @@ export default function NGOManagement() {
                         {ngo.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {ngo.donorCount || 0}
+                    </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex gap-2">
                         <button
@@ -199,23 +221,6 @@ export default function NGOManagement() {
                         >
                           <Eye size={18} />
                         </button>
-                        {ngo.isActive ? (
-                          <button
-                            onClick={() => handleDeactivate(ngo._id)}
-                            className="text-red-600 hover:text-red-800 transition"
-                            title="Deactivate"
-                          >
-                            <X size={18} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleActivate(ngo._id)}
-                            className="text-green-600 hover:text-green-800 transition"
-                            title="Activate"
-                          >
-                            <Check size={18} />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -261,151 +266,6 @@ export default function NGOManagement() {
           </div>
         )}
       </div>
-
-      {/* Details Modal */}
-      {detailsOpen && selectedNgo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-red-600 to-red-700 text-white p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold">{selectedNgo.name}</h2>
-              <button
-                onClick={() => setDetailsOpen(false)}
-                className="text-white hover:bg-red-700 p-2 rounded-lg transition"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 grid grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-4">
-                  Contact Information
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500">Email</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.email}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Phone</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.phone}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">NGO Code</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.organizationCode}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-4">
-                  Location Information
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500">City</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.city}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">State</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.state}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Address</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.address}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-4">
-                  NGO Details
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500">Registration Number</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.registrationNumber}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Status</p>
-                    <span
-                      className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(
-                        selectedNgo.status
-                      )}`}
-                    >
-                      {selectedNgo.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-600 mb-4">
-                  Status
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500">Active</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedNgo.isActive ? 'Yes' : 'No'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Registered On</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {new Date(selectedNgo.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 border-t border-gray-200 p-6 flex gap-3">
-              <button
-                onClick={() => setDetailsOpen(false)}
-                className="flex-1 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400 transition font-medium"
-              >
-                Close
-              </button>
-              {selectedNgo.isActive ? (
-                <button
-                  onClick={() => {
-                    handleDeactivate(selectedNgo._id);
-                    setDetailsOpen(false);
-                  }}
-                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium"
-                >
-                  Deactivate
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    handleActivate(selectedNgo._id);
-                    setDetailsOpen(false);
-                  }}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium"
-                >
-                  Activate
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
