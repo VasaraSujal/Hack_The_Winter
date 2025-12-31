@@ -18,6 +18,8 @@ import {
   cancelRegistration
 } from "../../controllers/NGO/NgoController.js";
 
+import { searchDonorsByCity } from "../../controllers/NGO/DonorSearchController.js";
+
 import authMiddleware from "../../middleware/auth.middleware.js";
 import roleMiddleware from "../../middleware/role.middleware.js";
 
@@ -71,4 +73,10 @@ router.get("/camp/:campId/registrations", roleMiddleware(["ngo"]), getCampRegist
 // Cancel registration (Donor can cancel their own)
 router.delete("/registration/:registrationId", roleMiddleware(["user"]), cancelRegistration);
 
+// ============= DONOR SEARCH ROUTES =============
+
+// Search donors by city (NGO only)
+router.get("/donors/search", roleMiddleware(["ngo", "ADMIN"]), searchDonorsByCity);
+
 export default router;
+
