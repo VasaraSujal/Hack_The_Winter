@@ -36,7 +36,7 @@ import NgoLayout from "./layouts/NgoLayout";
 import NgoOverview from "./pages/ngo/NgoDashboard";
 import NgoCamps from "./pages/ngo/CampManagement";
 import NgoSlots from "./pages/ngo/SlotManagement";
-import NgoDonors from "./pages/ngo/DonorRegistry";
+import NgoDonors from "./pages/ngo/DonorSearch";
 import NgoConnectivity from "./pages/ngo/ConnectivityGrid";
 import SuperAdminLayout from "./layouts/SuperAdminLayout";
 import SuperAdminDashboard from "./pages/superadmin/Dashboard";
