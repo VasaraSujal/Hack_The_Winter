@@ -34,6 +34,11 @@ import adminService from '../../services/adminService';
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState({
+    monthlyData: [],
+    bloodStockData: [],
+    activeUsersData: []
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -42,18 +47,40 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Try to fetch from backend API
-      const response = await adminService.getDashboardOverview();
       
-      console.log('Dashboard API Response:', response);
-      
-      if (response && response.data) {
-        // Handle nested data structure from API
-        const dashboardData = response.data.data || response.data;
-        console.log('Dashboard Data:', dashboardData);
+      // Fetch all dashboard data in parallel
+      const [overviewRes, growthRes, bloodTypesRes, usersRes] = await Promise.all([
+        adminService.getDashboardOverview(),
+        adminService.getGrowthTrends(),
+        adminService.getBloodTypeBreakdown(),
+        adminService.getActiveUsersTrend()
+      ]);
+
+      console.log('Dashboard API Response:', overviewRes);
+      console.log('Growth Trends Response:', growthRes);
+      console.log('Blood Types Response:', bloodTypesRes);
+      console.log('Users Trend Response:', usersRes);
+
+      if (overviewRes && overviewRes.data) {
+        const dashboardData = overviewRes.data.data || overviewRes.data;
         
+        // Extract real chart data
+        const growthData = growthRes.data.data || growthRes.data;
+        const bloodTypeData = bloodTypesRes.data.data || bloodTypesRes.data;
+        const usersData = usersRes.data.data || usersRes.data;
+
+        console.log('Dashboard Data:', dashboardData);
+        console.log('Growth Data:', growthData);
+        console.log('Blood Type Data:', bloodTypeData);
+        console.log('Users Data:', usersData);
+
         if (dashboardData && dashboardData.organizations) {
           setData(dashboardData);
+          setChartData({
+            monthlyData: growthData || [],
+            bloodStockData: bloodTypeData || [],
+            activeUsersData: usersData || []
+          });
           toast.success('Dashboard data loaded successfully');
           return;
         }
@@ -108,6 +135,37 @@ export default function Dashboard() {
       ]
     };
     setData(mockData);
+
+    // Mock chart data
+    const mockChartData = {
+      monthlyData: [
+        { month: 'Jan', hospitals: 5, ngos: 10, banks: 2 },
+        { month: 'Feb', hospitals: 7, ngos: 12, banks: 3 },
+        { month: 'Mar', hospitals: 10, ngos: 15, banks: 4 },
+        { month: 'Apr', hospitals: 12, ngos: 20, banks: 6 },
+        { month: 'May', hospitals: 12, ngos: 22, banks: 7 },
+        { month: 'Jun', hospitals: 12, ngos: 25, banks: 8 }
+      ],
+      bloodStockData: [
+        { name: 'O+', units: 450 },
+        { name: 'O-', units: 280 },
+        { name: 'A+', units: 520 },
+        { name: 'A-', units: 290 },
+        { name: 'B+', units: 380 },
+        { name: 'B-', units: 210 },
+        { name: 'AB+', units: 180 },
+        { name: 'AB-', units: 110 }
+      ],
+      activeUsersData: [
+        { month: 'Jan', activeUsers: 10, admins: 1, newUsers: 2 },
+        { month: 'Feb', activeUsers: 15, admins: 1, newUsers: 5 },
+        { month: 'Mar', activeUsers: 20, admins: 1, newUsers: 5 },
+        { month: 'Apr', activeUsers: 25, admins: 1, newUsers: 5 },
+        { month: 'May', activeUsers: 28, admins: 1, newUsers: 3 },
+        { month: 'Jun', activeUsers: 30, admins: 1, newUsers: 2 }
+      ]
+    };
+    setChartData(mockChartData);
   };
 
   if (loading) {
@@ -125,25 +183,10 @@ export default function Dashboard() {
     return <div className="p-6">No data available</div>;
   }
 
-  const monthlyData = [
-    { month: 'Jan', hospitals: 5, ngos: 10, banks: 2 },
-    { month: 'Feb', hospitals: 7, ngos: 12, banks: 3 },
-    { month: 'Mar', hospitals: 10, ngos: 15, banks: 4 },
-    { month: 'Apr', hospitals: 12, ngos: 20, banks: 6 },
-    { month: 'May', hospitals: 12, ngos: 22, banks: 7 },
-    { month: 'Jun', hospitals: 12, ngos: 25, banks: 8 }
-  ];
-
-  const bloodStockData = [
-    { name: 'O+', units: 450 },
-    { name: 'O-', units: 280 },
-    { name: 'A+', units: 520 },
-    { name: 'A-', units: 290 },
-    { name: 'B+', units: 380 },
-    { name: 'B-', units: 210 },
-    { name: 'AB+', units: 180 },
-    { name: 'AB-', units: 110 }
-  ];
+  // Use real chart data or fallback to empty arrays
+  const monthlyData = chartData.monthlyData.length > 0 ? chartData.monthlyData : [];
+  const bloodStockData = chartData.bloodStockData.length > 0 ? chartData.bloodStockData : [];
+  const activeUsersData = chartData.activeUsersData.length > 0 ? chartData.activeUsersData : [];
 
   const organizationDistribution = [
     { name: 'Hospitals', value: data.organizations?.hospitals || 12 },
@@ -407,6 +450,58 @@ export default function Dashboard() {
                 data.bloodStock?.status === 'WARNING' ? 'text-yellow-600' :
                 'text-red-600'
               }`}>{data.bloodStock?.status || 'OK'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* === ACTIVE USERS TREND & RECENT ACTIVITY === */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Line Chart - Active Users Trend */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-green-600" /> Active Users Trend
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={activeUsersData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="month" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip contentStyle={{ backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px' }} />
+              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              <Line type="monotone" dataKey="activeUsers" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 5 }} name="Active Users" />
+              <Line type="monotone" dataKey="newUsers" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 5 }} name="New Users" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* User Growth Summary */}
+        <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-blue-600" /> User Growth
+          </h3>
+          <div className="space-y-4">
+            <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-600">
+              <p className="text-sm text-green-700 font-semibold">Active Users</p>
+              <p className="text-2xl font-bold text-green-600 mt-1">{data.users?.total || 161}</p>
+              <p className="text-xs text-green-600 mt-1">Current active count</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-600">
+              <p className="text-sm text-blue-700 font-semibold">Organization Users</p>
+              <p className="text-2xl font-bold text-blue-600 mt-1">{data.users?.organizationUsers || 156}</p>
+              <p className="text-xs text-blue-600 mt-1">From partner organizations</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-600">
+              <p className="text-sm text-purple-700 font-semibold">System Admins</p>
+              <p className="text-2xl font-bold text-purple-600 mt-1">{data.users?.systemAdmins || 5}</p>
+              <p className="text-xs text-purple-600 mt-1">Platform administrators</p>
+            </div>
+            <div className="bg-gradient-to-r from-indigo-50 to-pink-50 rounded-lg p-4 border-l-4 border-indigo-600">
+              <p className="text-sm font-semibold text-indigo-700">Growth Rate</p>
+              <p className="text-xl font-bold mt-1">
+                <span className="text-green-600">↑ +5.2%</span>
+                <span className="text-xs text-gray-500 ml-2">this month</span>
+              </p>
             </div>
           </div>
         </div>

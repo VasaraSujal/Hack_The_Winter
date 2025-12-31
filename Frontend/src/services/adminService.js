@@ -159,6 +159,12 @@ const dashboardAPI = {
   getRecentActivity: (limit = 10) => adminAPI.get(`/admin/dashboard/activity?limit=${limit}`),
   
   getSystemHealth: () => adminAPI.get(`/admin/dashboard/health`),
+
+  getGrowthTrends: () => adminAPI.get(`/admin/dashboard/growth-trends`),
+
+  getBloodTypeBreakdown: () => adminAPI.get(`/admin/dashboard/blood-types`),
+
+  getActiveUsersTrend: () => adminAPI.get(`/admin/dashboard/active-users`),
 };
 
 // Merge dashboard services
