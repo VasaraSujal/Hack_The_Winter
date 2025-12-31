@@ -7,7 +7,7 @@ const navItems = [
   { label: "Dashboard Overview", path: "/ngo/dashboard/overview" },
   { label: "Camp Management", path: "/ngo/dashboard/camps" },
   { label: "Slot Management", path: "/ngo/dashboard/slots" },
-  { label: "Donor Registry", path: "/ngo/dashboard/donors" },
+  { label: "Donor Search", path: "/ngo/dashboard/donors" },
   { label: "Connectivity Grid", path: "/ngo/dashboard/connectivity" },
 ];
 
