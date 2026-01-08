@@ -24,7 +24,10 @@ export default function DonorRegistration() {
     donationDate: "",
     donationTime: "",
     campId: "",
+    campId: "",
     slotId: "",
+    latitude: null,
+    longitude: null,
   });
 
   const bloodGroups = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"];
@@ -104,6 +107,30 @@ export default function DonorRegistration() {
     }));
   };
 
+  const getLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    toast.loading("Fetching your location...", { id: "locationData" });
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormData((prev) => ({
+          ...prev,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        }));
+        toast.success("Location fetched successfully!", { id: "locationData" });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        toast.error("Unable to retrieve your location. Please enter address manually.", { id: "locationData" });
+      }
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -152,7 +179,10 @@ export default function DonorRegistration() {
         campId: formData.campId,
         slotId: formData.slotId,
         campName: selectedCamp.campName,
+        campName: selectedCamp.campName,
         campLocation: selectedCamp.location,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
       });
 
       toast.success("Registration successful! You are now registered as a blood donor.");
@@ -370,6 +400,17 @@ export default function DonorRegistration() {
                         rows={3}
                         className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-[#1F1F1F] placeholder-gray-400 focus:outline-none focus:border-[#7C1515] focus:ring-2 focus:ring-[#7C1515]/20 transition-all resize-none"
                       ></textarea>
+                      <button
+                        type="button"
+                        onClick={getLocation}
+                        className="mt-2 text-sm flex items-center gap-2 text-[#7C1515] hover:text-[#5A0E0E] font-semibold transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {formData.latitude ? "Location Captured ✅" : "📍 Use Current Location"}
+                      </button>
                     </div>
 
                     {/* Email */}
