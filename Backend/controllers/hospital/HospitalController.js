@@ -21,11 +21,15 @@ export class HospitalController {
                 phone,
                 address,
                 city,
-                coordinates // [longitude, latitude]
+                state,
+                country,
+                pincode,
+                latitude,
+                longitude
             } = req.body;
 
             // Validate required fields
-            if (!name || !registrationNumber || !email || !phone || !address || !city || !coordinates) {
+            if (!name || !registrationNumber || !email || !phone || !address || !city) {
                 return res.status(400).json({
                     success: false,
                     message: "All fields are required"
@@ -49,18 +53,26 @@ export class HospitalController {
                 });
             }
 
+            // Construct GeoJSON Location
+            const location = {
+                type: "Point",
+                coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0], // [Long, Lat]
+                address,
+                city,
+                state,
+                country,
+                pincode
+            };
+
             // Create hospital data
             const hospitalData = {
                 name,
                 registrationNumber,
                 email: email.toLowerCase(),
                 phone,
-                address,
-                city,
-                location: {
-                    type: "Point",
-                    coordinates: coordinates // [longitude, latitude]
-                }
+                location, // Use the new GeoJSON structure
+                address, // Keep strictly for backward compatibility if needed, but location.address is better
+                city     // Keep strictly for backward compatibility
             };
 
             const hospital = await Hospital.create(hospitalData);
@@ -86,7 +98,7 @@ export class HospitalController {
      */
     static async searchBloodAvailability(req, res) {
         try {
-            const { bloodType, minUnits, city } = req.query;
+            const { bloodType, minUnits, city, latitude, longitude, radius } = req.query;
 
             if (!bloodType) {
                 return res.status(400).json({
@@ -96,6 +108,8 @@ export class HospitalController {
             }
 
             // 1. Search Organizations (Blood Banks)
+            // Note: Organization search currently relies on City matching. 
+            // In the future, this could be upgraded to geospatial search as well.
             let results = await Organization.searchBloodStock(
                 bloodType,
                 minUnits || 1,
@@ -108,10 +122,35 @@ export class HospitalController {
             if (results.length === 0) {
                 console.log(`[BLOOD_SEARCH] No organizations found for ${bloodType}. Searching donors...`);
                 const db = getDB();
-                // Ensure db connection is active (it should be since server is running)
 
-                const donorQuery = { bloodGroup: bloodType };
-                if (city) {
+                let donorQuery = { bloodGroup: bloodType };
+
+                // Geospatial Search if coordinates are provided
+                if (latitude && longitude) {
+                    const searchRadiusKm = parseInt(radius) || 5;
+                    const searchRadiusMeters = searchRadiusKm * 1000;
+
+                    console.log(`[BLOOD_SEARCH] Using Geospatial Search. Center: [${longitude}, ${latitude}], Radius: ${searchRadiusKm}km`);
+
+                    // Ensure Index Exists (Idempotent)
+                    try {
+                        await db.collection("donors").createIndex({ location: "2dsphere" });
+                    } catch (idxError) {
+                        console.warn("Failed to create geospatial index:", idxError.message);
+                    }
+
+                    donorQuery.location = {
+                        $near: {
+                            $geometry: {
+                                type: "Point",
+                                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+                            },
+                            $maxDistance: searchRadiusMeters
+                        }
+                    };
+                } else if (city) {
+                    // Fallback to City Search
+                    console.log(`[BLOOD_SEARCH] Using City Search: ${city}`);
                     donorQuery.city = new RegExp(city, "i");
                 }
 
