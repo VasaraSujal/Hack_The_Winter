@@ -32,6 +32,7 @@ class Hospital {
       city: hospitalData.city,
       state: hospitalData.state,
       pinCode: hospitalData.pinCode,
+      location: hospitalData.location, // Added GeoJSON location
       contactPerson: hospitalData.contactPerson,
       email: hospitalData.email.toLowerCase(),
       phone: hospitalData.phone,
@@ -75,7 +76,7 @@ class Hospital {
 
     // Base query for hospitals only
     const query = { ...this.getHospitalQuery() };
-    
+
     // Add filters
     if (filters.status) query.status = filters.status;
     if (filters.city) query.city = new RegExp(filters.city, "i");
@@ -134,7 +135,7 @@ class Hospital {
     const collection = this.getCollection();
     try {
       const result = await collection.updateOne(
-        { 
+        {
           _id: new ObjectId(id),
           ...this.getHospitalQuery()
         },
