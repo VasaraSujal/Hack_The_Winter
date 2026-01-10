@@ -59,6 +59,19 @@ export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, ho
     }));
   };
 
+  // Get available units for selected blood bank and blood group
+  const getAvailableUnits = () => {
+    if (!formData.bloodBankId || !formData.bloodGroup) return null;
+    
+    const selectedBank = bloodBanks.find(b => b._id === formData.bloodBankId) || preSelectedBloodBank;
+    if (!selectedBank || !selectedBank.bloodStock) return null;
+    
+    const stock = selectedBank.bloodStock[formData.bloodGroup];
+    return stock?.units || 0;
+  };
+
+  const availableUnits = getAvailableUnits();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('Handling submit...', formData);
@@ -74,6 +87,12 @@ export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, ho
     }
     if (!formData.unitsRequired || formData.unitsRequired <= 0) {
       setError('Please enter valid number of units');
+      return;
+    }
+
+    // Check if requested units exceed available stock
+    if (availableUnits !== null && parseInt(formData.unitsRequired) > availableUnits) {
+      setError(`Requested units (${formData.unitsRequired}) exceed available stock (${availableUnits} units). Please request ${availableUnits} units or less.`);
       return;
     }
 
@@ -199,6 +218,23 @@ export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, ho
                   </option>
                 ))}
               </select>
+              {/* Show available units if blood bank and blood group are selected */}
+              {availableUnits !== null && formData.bloodGroup && (
+                <div className={`mt-3 rounded-xl border-2 p-3 text-sm ${
+                  availableUnits > 0 
+                    ? 'border-green-300 bg-green-50 text-green-800' 
+                    : 'border-amber-300 bg-amber-50 text-amber-800'
+                }`}>
+                  <p className="font-semibold">
+                    {availableUnits > 0 
+                      ? `✓ Available: ${availableUnits} units of ${formData.bloodGroup}` 
+                      : `⚠️ No ${formData.bloodGroup} units available at this blood bank`}
+                  </p>
+                  {availableUnits > 0 && (
+                    <p className="text-xs mt-1">You can request up to {availableUnits} units</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Units Required */}
