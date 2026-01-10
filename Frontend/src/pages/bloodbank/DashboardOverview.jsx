@@ -1,11 +1,16 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { getAllNgoDrives } from "../../services/bloodBankApi";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import {
+  getAllNgoDrives,
+  getAlertSummary,
+  getShortageAlerts,
+} from "../../services/bloodBankApi";
 import {
   getBloodBankRequestStats,
   getBloodBankRequests,
 } from "../../services/hospitalBloodRequestApi";
 import toast from "react-hot-toast";
+import { getVerificationStatusLabel } from "../../utils/organizationStatus";
 
 const normalizeRequests = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -21,12 +26,18 @@ export default function DashboardOverview() {
     pendingRequests: 0,
     completedSupplies: 0,
     upcomingNgoDrives: 0,
-    verificationStatus: "VERIFIED",
+    verificationStatus: "PENDING",
   });
   const [requests, setRequests] = useState([]);
   const [ngoDrives, setNgoDrives] = useState([]);
+  const [alertSummary, setAlertSummary] = useState(null);
+  const [shortageAlerts, setShortageAlerts] = useState({
+    criticalShortages: [],
+    lowStockAlerts: [],
+  });
 
   const navigate = useNavigate();
+  const { organization } = useOutletContext() || {};
 
   const quickActions = [
     { label: "Create Request", icon: "🩸", action: "request" },
@@ -56,6 +67,14 @@ export default function DashboardOverview() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (!organization) return;
+    setStats((prev) => ({
+      ...prev,
+      verificationStatus: getVerificationStatusLabel(organization),
+    }));
+  }, [organization]);
 
   const fetchDashboardData = async () => {
     try {
@@ -137,6 +156,27 @@ export default function DashboardOverview() {
         console.error("Error fetching drives:", error);
       }
 
+      try {
+        const [summaryRes, shortageRes] = await Promise.all([
+          getAlertSummary(),
+          getShortageAlerts(),
+        ]);
+
+        if (summaryRes.data?.success) {
+          setAlertSummary(summaryRes.data.data || summaryRes.data);
+        }
+
+        if (shortageRes.data?.success) {
+          const payload = shortageRes.data.data || {};
+          setShortageAlerts({
+            criticalShortages: payload.criticalShortages || [],
+            lowStockAlerts: payload.lowStockAlerts || [],
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching alerts:", error);
+      }
+
       const upcomingDrivesCount = fetchedDrives.filter(
         (drive) => new Date(drive.driveDate) >= new Date()
       ).length;
@@ -144,7 +184,8 @@ export default function DashboardOverview() {
       setStats((prev) => ({
         ...prev,
         upcomingNgoDrives: upcomingDrivesCount,
-        verificationStatus: "VERIFIED",
+        verificationStatus:
+          getVerificationStatusLabel(organization) || prev.verificationStatus,
       }));
 
     } catch (error) {
@@ -166,13 +207,17 @@ export default function DashboardOverview() {
       {
         title: "Pending Requests",
         value: stats.pendingRequests,
-        meta: `${requests.filter((r) => r.status === "PENDING").length} awaiting action`,
+        meta: `${
+          requests.filter((r) => r.status === "PENDING").length
+        } awaiting action`,
         accent: "from-[#d1661c] to-[#f2994a]",
       },
       {
         title: "Completed Supplies",
         value: stats.completedSupplies,
-        meta: `${requests.filter((r) => r.status === "COMPLETED").length} completed`,
+        meta: `${
+          requests.filter((r) => r.status === "COMPLETED").length
+        } completed`,
         accent: "from-[#2c8a49] to-[#5ec271]",
       },
       {
@@ -187,11 +232,11 @@ export default function DashboardOverview() {
       {
         title: "Verification Status",
         value: stats.verificationStatus,
-        meta: "System Admin",
+        meta: organization?.adminName || "System Admin",
         accent: "from-[#d93f42] to-[#f08a8d]",
       },
     ],
-    [stats, requests, ngoDrives]
+    [stats, requests, ngoDrives, organization]
   );
 
   if (loading) {
@@ -213,10 +258,14 @@ export default function DashboardOverview() {
             Overview
           </p>
           <h3 className="text-3xl font-semibold text-[#31101e]">
-            Mission Control
+            {organization?.name || "Mission Control"}
           </h3>
           <p className="text-sm text-[#7c4a5e]">
-            Real-time intelligence synced with SEBN core.
+            {organization?.address?.city
+              ? `Operations hub • ${organization.address.city}, ${
+                  organization.address.state || ""
+                }`
+              : "Real-time intelligence synced with SEBN core."}
           </p>
         </div>
         <div className="flex gap-3">
@@ -251,6 +300,111 @@ export default function DashboardOverview() {
           </article>
         ))}
       </div>
+
+      {alertSummary && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <AlertMetric
+            label="Total Alerts"
+            value={alertSummary.total ?? 0}
+            badgeClass="bg-gradient-to-r from-[#8f0f1a] to-[#c62832]"
+          />
+          <AlertMetric
+            label="Unread Alerts"
+            value={alertSummary.unread ?? 0}
+            badgeClass="bg-gradient-to-r from-[#d97706] to-[#f59e0b]"
+          />
+          <AlertMetric
+            label="Critical Alerts"
+            value={alertSummary.critical ?? 0}
+            badgeClass="bg-gradient-to-r from-[#b91c1c] to-[#ef4444]"
+          />
+          <AlertMetric
+            label="High Priority"
+            value={alertSummary.high ?? 0}
+            badgeClass="bg-gradient-to-r from-[#db2777] to-[#f472b6]"
+          />
+        </div>
+      )}
+
+      <ShortagePanel shortages={shortageAlerts} />
     </section>
+  );
+}
+
+function AlertMetric({ label, value, badgeClass }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white p-5 shadow-[0_15px_35px_rgba(143,15,26,0.12)]">
+      <p className="text-xs uppercase tracking-[0.3em] text-[#7c4a5e]">
+        {label}
+      </p>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-3xl font-semibold text-[#31101e]">{value}</span>
+        <span
+          className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-white ${badgeClass}`}
+        >
+          live
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ShortagePanel({ shortages }) {
+  const { criticalShortages = [], lowStockAlerts = [] } = shortages || {};
+  const hasAlerts =
+    criticalShortages.length > 0 || lowStockAlerts.length > 0;
+
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white p-6 shadow-[0_25px_60px_rgba(77,10,15,0.12)]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-[#b91c1c]">
+            Blood Stock Alerts
+          </p>
+          <h4 className="text-xl font-semibold text-[#31101e]">
+            Network Shortages
+          </h4>
+        </div>
+      </div>
+
+      {hasAlerts ? (
+        <div className="mt-6 grid gap-4">
+          {criticalShortages.map((alert) => (
+            <AlertRow key={`critical-${alert.bloodGroup}`} alert={alert} />
+          ))}
+          {lowStockAlerts.map((alert) => (
+            <AlertRow key={`low-${alert.bloodGroup}`} alert={alert} muted />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-8 rounded-2xl border border-pink-50 bg-pink-50/60 p-6 text-center text-sm text-[#7c4a5e]">
+          Network stable — no shortage alerts.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlertRow({ alert, muted = false }) {
+  const badgeColor = muted
+    ? "bg-[#fff3e4] text-[#b05f09]"
+    : "bg-[#fde4e4] text-[#9e121c]";
+
+  return (
+    <div className="rounded-2xl border border-pink-50 bg-pink-50/40 p-4 sm:flex sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-[#31101e]">
+          {alert.bloodGroup} • {alert.totalAvailable || 0} units
+        </p>
+        <p className="text-xs text-[#7c4a5e]">
+          {alert.recommendation || "Alert donors for collection"}
+        </p>
+      </div>
+      <span
+        className={`mt-3 inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] ${badgeColor}`}
+      >
+        {alert.isRare ? "rare" : "low"}
+      </span>
+    </div>
   );
 }

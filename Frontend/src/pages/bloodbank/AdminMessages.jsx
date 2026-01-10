@@ -1,12 +1,15 @@
-const adminSnapshot = {
-  verificationStatus: "VERIFIED",
-  lastVerifiedBy: "System Admin",
-  message: "Your blood bank has been successfully verified.",
-  verifiedAt: "2025-12-20",
-};
+import { useOutletContext } from "react-router-dom";
+import {
+  getVerificationDetails,
+  getVerificationStatusLabel,
+} from "../../utils/organizationStatus";
 
 const statusBadgeStyles = {
   VERIFIED:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
+  APPROVED:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
+  ACTIVE:
     "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
   PENDING:
     "bg-[#fff3e4] text-[#b05f09] border border-[#f0c18c] shadow-[0_3px_12px_rgba(219,149,58,0.2)]",
@@ -15,11 +18,38 @@ const statusBadgeStyles = {
 };
 
 const formatShortDate = (iso) =>
-  new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-  }).format(new Date(iso));
+  iso
+    ? new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "medium",
+      }).format(new Date(iso))
+    : "--";
 
 export default function AdminMessages() {
+  const { organization } = useOutletContext() || {};
+  const verificationDetails = getVerificationDetails(organization);
+  const statusLabel = getVerificationStatusLabel(organization);
+  const timeline = [
+    {
+      title:
+        statusLabel === "SUSPENDED" ? "Account Suspended" : "Account Verified",
+      description:
+        statusLabel === "SUSPENDED"
+          ? verificationDetails.notice
+          : "System Admin approved your registration",
+      date: verificationDetails.verifiedAt,
+    },
+    {
+      title: "Profile Updated",
+      description: "Contact information synchronized",
+      date: organization?.updatedAt,
+    },
+    {
+      title: "Registration Submitted",
+      description: "Initial application received",
+      date: organization?.createdAt,
+    },
+  ];
+
   return (
     <section className="rounded-3xl border border-white/60 bg-white p-6 shadow-[0_25px_60px_rgba(255,154,187,0.2)]">
       <p className="text-xs uppercase tracking-[0.4em] text-[#ff4d6d]">
@@ -40,24 +70,24 @@ export default function AdminMessages() {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                statusBadgeStyles[adminSnapshot.verificationStatus]
+                statusBadgeStyles[statusLabel] || statusBadgeStyles.PENDING
               }`}
             >
-              {adminSnapshot.verificationStatus}
+              {statusLabel}
             </span>
             <p className="text-sm text-[#7c4a5e]">
-              Verified by {adminSnapshot.lastVerifiedBy} on{" "}
-              {formatShortDate(adminSnapshot.verifiedAt)}
+              Verified by {verificationDetails.verifiedBy} on{" "}
+              {formatShortDate(verificationDetails.verifiedAt)}
             </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-pink-100 bg-linear-to-br from-[#ffe5ec] to-[#fff5f9] p-5">
+        <div className="rounded-2xl border border-pink-100 bg-gradient-to-br from-[#ffe5ec] to-[#fff5f9] p-5">
           <p className="text-xs uppercase tracking-[0.4em] text-[#ff4d6d]/70">
             Admin Notice
           </p>
           <p className="mt-3 text-lg font-semibold text-[#31101e]">
-            {adminSnapshot.message}
+            {verificationDetails.notice}
           </p>
           <p className="mt-2 text-sm text-[#7c4a5e]">
             The central control team monitors adherence to SEBN SOPs.
@@ -94,27 +124,24 @@ export default function AdminMessages() {
             Recent Activity Log
           </p>
           <div className="mt-3 space-y-3">
-            <div className="flex items-center justify-between border-b border-blue-100 pb-2">
-              <div>
-                <p className="text-sm font-semibold text-[#31101e]">Account Verified</p>
-                <p className="text-xs text-[#7c4a5e]">System Admin approved your registration</p>
+            {timeline.map((event, idx) => (
+              <div
+                key={event.title}
+                className={`flex items-center justify-between ${
+                  idx !== timeline.length - 1 ? "border-b border-blue-100 pb-2" : ""
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-[#31101e]">
+                    {event.title}
+                  </p>
+                  <p className="text-xs text-[#7c4a5e]">{event.description}</p>
+                </div>
+                <p className="text-xs text-[#8a5c70]">
+                  {formatShortDate(event.date)}
+                </p>
               </div>
-              <p className="text-xs text-[#8a5c70]">{formatShortDate(adminSnapshot.verifiedAt)}</p>
-            </div>
-            <div className="flex items-center justify-between border-b border-blue-100 pb-2">
-              <div>
-                <p className="text-sm font-semibold text-[#31101e]">Profile Updated</p>
-                <p className="text-xs text-[#7c4a5e]">Contact information synchronized</p>
-              </div>
-              <p className="text-xs text-[#8a5c70]">Dec 19, 2025</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[#31101e]">Registration Submitted</p>
-                <p className="text-xs text-[#7c4a5e]">Initial application received</p>
-              </div>
-              <p className="text-xs text-[#8a5c70]">Dec 15, 2025</p>
-            </div>
+            ))}
           </div>
         </div>
       </div>

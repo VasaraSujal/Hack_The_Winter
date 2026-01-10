@@ -1,223 +1,291 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
+import { CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import toast from "react-hot-toast";
 import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  MapPin,
-  Briefcase,
-  Stethoscope,
-  ChevronRight,
-  Filter,
-  Search
-} from "lucide-react";
-import { toast } from "react-hot-toast";
-import * as Dialog from "@radix-ui/react-dialog";
-import { getAllRequests, updateRequestStatus } from "../../services/resourceRequestApi";
+  getHospitalNgoDrives,
+  completeNgoDrive,
+} from "../../services/hospitalNgoDriveApi";
+import { getVerificationStatusLabel } from "../../utils/organizationStatus";
+import CreateDriveRequestModal from "../../components/CreateDriveRequestModal";
+
+const statusPills = {
+  PENDING:
+    "bg-[#fff3e4] text-[#b05f09] border border-[#f0c18c] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]",
+  ACCEPTED:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]",
+  COMPLETED:
+    "bg-[#e7f3ff] text-[#185a9d] border border-[#b6d8f2] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]",
+  REJECTED:
+    "bg-[#fde4e4] text-[#9e121c] border border-[#f5a5ad] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]",
+  SCHEDULED:
+    "bg-[#f1f5f9] text-[#475569] border border-[#cbd5f5] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]",
+};
+
+const formatDate = (iso) =>
+  iso
+    ? new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "medium",
+      }).format(new Date(iso))
+    : "Date not set";
 
 export default function NgoDrives() {
-  const [requests, setRequests] = useState([]);
+  const { organization, isVerified } = useOutletContext() || {};
+  const [drives, setDrives] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, pending, approved, rejected
-  const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [filter, setFilter] = useState("ALL");
+  const [error, setError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const organizationId =
+    organization?._id ||
+    JSON.parse(localStorage.getItem("user") || "{}")?.organizationId;
+
+  const token = localStorage.getItem("token");
+  const verificationStatus = getVerificationStatusLabel(organization);
+  const actionsLocked = !isVerified;
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    if (!organizationId || !token) return;
+    fetchDrives();
+  }, [organizationId, token]);
 
-  const fetchRequests = async () => {
+  const fetchDrives = async () => {
     try {
       setLoading(true);
-      const res = await getAllRequests();
-      if (res.data?.success) {
-        setRequests(res.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching admin requests", error);
-      toast.error("Failed to load requests");
+      setError(null);
+      const response = await getHospitalNgoDrives(
+        organizationId,
+        { page: 1, limit: 100 },
+        token
+      );
+      setDrives(response.data?.data || []);
+    } catch (err) {
+      console.error("Error fetching NGO drives:", err);
+      setError(err.response?.data?.message || "Failed to load NGO drives");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusUpdate = async (id, status, reason = null) => {
+  const filteredDrives = useMemo(
+    () =>
+      drives.filter(
+        (drive) => filter === "ALL" || drive.status === filter
+      ),
+    [drives, filter]
+  );
+
+  const handleMarkCompleted = async (driveId) => {
     try {
-      const res = await updateRequestStatus(id, status, reason);
-      if (res.data?.success) {
-        toast.success(`Request ${status} successfully`);
-        fetchRequests(); // Refresh
-        setRejectModalOpen(false);
-        setRejectionReason("");
-        setSelectedRequest(null);
-      }
-    } catch (error) {
-      toast.error("Failed to update status");
+      await completeNgoDrive(
+        driveId,
+        {
+          completedBy: organizationId,
+          actualDonors: 0,
+          remarks: "Drive marked complete from dashboard",
+        },
+        token
+      );
+      toast.success("Drive marked as completed");
+      fetchDrives();
+    } catch (err) {
+      console.error("Error completing drive:", err);
+      toast.error(
+        err.response?.data?.message || "Failed to mark drive completed"
+      );
     }
   };
 
-  const openRejectModal = (req) => {
-    setSelectedRequest(req);
-    setRejectModalOpen(true);
-  };
+  if (!organizationId) {
+    return (
+      <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-lg">
+        <p className="text-sm font-semibold text-[#9e121c]">
+          Organization details missing. Please log in again.
+        </p>
+      </section>
+    );
+  }
 
-  const filteredRequests = requests.filter(req => {
-    if (filter === 'all') return true;
-    return req.status === filter;
-  });
+  if (loading) {
+    return (
+      <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-lg">
+        <div className="flex flex-col items-center gap-4 py-16">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#ff4d6d] border-r-transparent" />
+          <p className="text-sm font-medium text-[#7c4a5e]">
+            Syncing NGO drives with SEBN...
+          </p>
+        </div>
+      </section>
+    );
+  }
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'approved':
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            <CheckCircle className="h-3 w-3" /> Approved
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-            <XCircle className="h-3 w-3" /> Rejected
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            <Clock className="h-3 w-3" /> Pending
-          </span>
-        );
-    }
-  };
+  if (error) {
+    return (
+      <section className="rounded-3xl border border-white/70 bg-white p-6 shadow-lg">
+        <div className="rounded-2xl border border-[#f5a5ad] bg-[#fde4e4] p-6 text-center">
+          <p className="text-lg font-semibold text-[#9e121c]">Error Loading Drives</p>
+          <p className="mt-2 text-sm text-[#7c4a5e]">{error}</p>
+          <button
+            onClick={fetchDrives}
+            className="mt-4 rounded-full bg-[#ff4d6d] px-6 py-2 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(255,77,109,0.3)] transition hover:bg-[#e0435f]"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="space-y-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+    <section className="space-y-6 rounded-3xl border border-white/80 bg-white p-6 shadow-[0_25px_60px_rgba(241,122,146,0.18)]">
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Inbox</p>
-          <h2 className="text-2xl font-bold text-gray-900">Resource Requests</h2>
+          <p className="text-xs uppercase tracking-[0.4em] text-[#ff4d6d]">
+            NGO Donation Drives
+          </p>
+          <h2 className="text-2xl font-semibold text-[#31101e]">
+            {organization?.name || "NGO Collaborations"}
+          </h2>
+          <p className="text-sm text-[#7c4a5e]">
+            Partner with trusted NGOs to maintain critical reserves.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg bg-gray-50 px-3 py-2 border border-gray-200">
-            <Filter className="h-4 w-4 text-gray-400 mr-2" />
+        <div className="flex flex-wrap gap-3 text-xs font-semibold text-[#7c4a5e]">
+          <label className="flex items-center gap-2">
+            Status
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer"
+              className="rounded-full border border-pink-100 bg-white px-3 py-1 focus:border-[#ff4d6d]"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="ALL">All</option>
+              <option value="PENDING">Pending</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="COMPLETED">Completed</option>
             </select>
-          </div>
+          </label>
+          <button
+            disabled={actionsLocked}
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-full bg-gradient-to-r from-[#8f0f1a] to-[#c62832] px-5 py-2 text-xs font-semibold text-white shadow-[0_15px_35px_rgba(143,15,26,0.25)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            + New Drive Request
+          </button>
         </div>
       </header>
 
-      <div className="grid gap-4">
-        {filteredRequests.map(req => (
-          <div key={req._id} className="group flex flex-col md:flex-row md:items-center justify-between gap-6 rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-md hover:border-pink-100">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                {getStatusBadge(req.status)}
-                <span className="text-xs text-gray-400 font-medium">
-                  ID: {req._id.substring(req._id.length - 6).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{req.campName}</h3>
-                <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                  <span className="font-semibold text-gray-700">{req.organizationName}</span>
-                  • {req.organizerName}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                <span className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg">
-                  <MapPin className="h-4 w-4 text-gray-400" /> {req.location || "N/A"}
-                </span>
-                <span className="flex items-center gap-1.5 bg-pink-50 px-3 py-1.5 rounded-lg text-pink-700">
-                  <Briefcase className="h-4 w-4" /> Equipment: <b>{req.equipmentCount}</b>
-                </span>
-                <span className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg text-blue-700">
-                  <Stethoscope className="h-4 w-4" /> Doctors: <b>{req.doctorCount}</b>
-                </span>
-              </div>
+      {!isVerified && (
+        <p className="rounded-2xl border border-[#f0c18c] bg-[#fff3e4] px-4 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-[#b05f09]">
+          Drive creation disabled until verification completes.
+        </p>
+      )}
 
-              {req.status === 'rejected' && req.rejectionReason && (
-                <div className="bg-red-50 border border-red-100 p-3 rounded-lg text-sm text-red-800">
-                  <strong>Rejection Reason:</strong> {req.rejectionReason}
+      {filteredDrives.length === 0 ? (
+        <div className="rounded-2xl border border-pink-50 bg-pink-50/60 p-10 text-center">
+          <p className="text-sm font-semibold text-[#7c4a5e]">
+            {filter !== "ALL"
+              ? "No drives match this filter."
+              : "No NGO drives logged yet. Start by creating a request."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredDrives.map((drive) => (
+            <article
+              key={drive._id}
+              className="rounded-2xl border border-white/70 bg-white p-5 shadow-[0_15px_40px_rgba(255,77,109,0.12)]"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xl font-semibold text-[#31101e]">
+                    {drive.driveTitle || "Blood Donation Drive"}
+                  </h4>
+                  <p className="text-sm text-[#7c4a5e]">
+                    {drive.ngoId?.name || "NGO Partner"} • {formatDate(drive.driveDate)}
+                  </p>
                 </div>
-              )}
-            </div>
-
-            {req.status === 'pending' && (
-              <div className="flex items-center gap-3 shrink-0 border-t md:border-t-0 pt-4 md:pt-0 mt-4 md:mt-0">
-                <button
-                  onClick={() => openRejectModal(req)}
-                  className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    statusPills[drive.status] || statusPills.PENDING
+                  }`}
                 >
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleStatusUpdate(req._id, 'approved')}
-                  className="rounded-full bg-[#ff4d6d] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#ff3355] shadow-lg shadow-pink-200 transition"
-                >
-                  Approve
-                </button>
+                  {drive.status}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
 
-        {loading && <div className="text-center py-10">Loading...</div>}
-        {!loading && filteredRequests.length === 0 && (
-          <div className="text-center py-12 text-gray-400 bg-white rounded-3xl border border-dashed border-gray-200">
-            No requests found matching filters.
-          </div>
-        )}
-      </div>
+              <div className="mt-4 grid gap-4 rounded-xl border border-pink-50 bg-pink-50/40 p-4 text-sm text-[#5c283a] sm:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-[#ff4d6d]">
+                    Expected Donors
+                  </p>
+                  <p className="text-2xl font-semibold text-[#31101e]">
+                    {drive.expectedDonors || drive.expectedUnits || 0}
+                  </p>
+                </div>
+                {drive.actualDonors > 0 && (
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-[#1f7a3a]">
+                      Actual Donors
+                    </p>
+                    <p className="text-2xl font-semibold text-[#1f7a3a]">
+                      {drive.actualDonors}
+                    </p>
+                  </div>
+                )}
+              </div>
 
-      {/* Rejection Modal */}
-      <Dialog.Root open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl z-50 border border-red-100">
-            <Dialog.Title className="text-xl font-bold text-gray-900 mb-2">
-              Reject Request
-            </Dialog.Title>
-            <Dialog.Description className="text-sm text-gray-500 mb-4">
-              Please provide a reason for rejecting this request.
-            </Dialog.Description>
+              {drive.location?.venueName && (
+                <p className="mt-3 text-xs text-[#7c4a5e]">
+                  <strong>Venue:</strong> {drive.location.venueName},{" "}
+                  {drive.location.city || organization?.address?.city || "City TBD"}
+                </p>
+              )}
 
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Reason for rejection..."
-              className="w-full h-32 rounded-xl border border-gray-200 p-3 text-sm focus:border-red-400 focus:outline-none resize-none mb-4"
-            />
+              {drive.hospitalNotes && (
+                <p className="mt-2 text-xs text-[#7c4a5e]">
+                  <strong>Notes:</strong> {drive.hospitalNotes}
+                </p>
+              )}
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setRejectModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={!rejectionReason.trim()}
-                onClick={() => handleStatusUpdate(selectedRequest._id, 'rejected', rejectionReason)}
-                className="px-6 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-full disabled:opacity-50"
-              >
-                Confirm Reject
-              </button>
-            </div>
-            <Dialog.Close asChild>
-              <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                <XCircle className="h-6 w-6" />
-              </button>
-            </Dialog.Close>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+              <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold">
+                {drive.status === "ACCEPTED" && (
+                  <button
+                    disabled={actionsLocked}
+                    onClick={() => handleMarkCompleted(drive._id)}
+                    className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Mark Completed
+                  </button>
+                )}
+                {drive.status === "PENDING" && (
+                  <span className="rounded-full bg-[#fff3e4] px-4 py-2 text-[#b05f09]">
+                    Awaiting NGO confirmation
+                  </span>
+                )}
+                {drive.status === "COMPLETED" && (
+                  <span className="rounded-full bg-[#ecf8ef] px-4 py-2 text-[#1f7a3a]">
+                    ✓ Drive Completed
+                  </span>
+                )}
+                {drive.status === "REJECTED" && (
+                  <span className="rounded-full bg-[#fde4e4] px-4 py-2 text-[#9e121c]">
+                    Declined by NGO
+                  </span>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <CreateDriveRequestModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchDrives}
+        hospitalId={organizationId}
+        organization={organization}
+      />
     </section>
   );
 }

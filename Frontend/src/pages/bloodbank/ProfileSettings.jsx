@@ -1,84 +1,59 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useOutletContext } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import { getOrganizationByCode, updateBloodBank } from "../../services/bloodBankApi";
+import { updateBloodBank } from "../../services/bloodBankApi";
 import toast from "react-hot-toast";
 
+const initialFormState = {
+  name: "",
+  licenseNumber: "",
+  email: "",
+  phone: "",
+  city: "",
+  address: "",
+  verificationStatus: "",
+  establishedYear: "",
+  capacity: "",
+};
+
 export default function ProfileSettings() {
-  const [loading, setLoading] = useState(true);
+  const { organization, refetchOrganization } = useOutletContext() || {};
   const [isEditing, setIsEditing] = useState(false);
-  const [bloodBankData, setBloodBankData] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    licenseNumber: "",
-    email: "",
-    phone: "",
-    city: "",
-    address: "",
-    verificationStatus: "",
-    establishedYear: "",
-    capacity: "",
-  });
+  const [formData, setFormData] = useState(initialFormState);
+
+  const isReady = Boolean(organization);
+
+  const formattedAddress = useMemo(() => {
+    if (!organization?.address) return "";
+    const { street, city, state, pincode } = organization.address;
+    return [street, city, state, pincode].filter(Boolean).join(", ");
+  }, [organization]);
 
   useEffect(() => {
-    fetchBloodBankProfile();
-  }, []);
-
-  const fetchBloodBankProfile = async () => {
-    try {
-      setLoading(true);
-      
-      // Get organization code from logged-in user
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const organizationCode = user.organizationCode;
-
-      if (!organizationCode) {
-        toast.error("Organization code not found");
-        return;
-      }
-
-      console.log("Fetching organization:", organizationCode);
-
-      // Fetch from organizations collection using organization code
-      const response = await getOrganizationByCode(organizationCode);
-      
-      console.log("Organization response:", response.data);
-
-      if (response.data?.success && response.data?.data) {
-        const data = response.data.data;
-        setBloodBankData(data);
-        
-        console.log("Organization data:", data);
-        
-        // Set form data with correct organization collection structure
-        setFormData({
-          name: data.name || "",
-          licenseNumber: data.licenseNumber || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          city: data.address?.city || "",
-          address: data.address?.street 
-            ? `${data.address.street}, ${data.address.city || ""}, ${data.address.state || ""} ${data.address.pincode || ""}`.trim()
-            : "",
-          verificationStatus: data.verificationStatus?.status || data.status || "PENDING",
-          establishedYear: data.licenseIssuedDate 
-            ? new Date(data.licenseIssuedDate).getFullYear().toString() 
-            : "",
-          capacity: data.storageCapacity ? `${data.storageCapacity} units` : "",
-        });
-      } else {
-        toast.error("Organization profile not found");
-      }
-    } catch (error) {
-      console.error("Error fetching organization profile:", error);
-      toast.error("Failed to load profile data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!organization) return;
+    setFormData({
+      name: organization.name || "",
+      licenseNumber: organization.licenseNumber || "",
+      email: organization.email || "",
+      phone: organization.phone || "",
+      city: organization.address?.city || "",
+      address: formattedAddress,
+      verificationStatus:
+        organization.verificationStatus?.status ||
+        organization.status ||
+        "PENDING",
+      establishedYear: organization.licenseIssuedDate
+        ? new Date(organization.licenseIssuedDate).getFullYear().toString()
+        : "",
+      capacity: organization.storageCapacity
+        ? `${organization.storageCapacity} units`
+        : "",
+    });
+  }, [organization, formattedAddress]);
 
   const handleDownloadCompliance = () => {
-    if (!bloodBankData) {
-      toast.error("Profile data missing. Please refresh and try again.");
+    if (!organization) {
+      toast.error("Profile data missing. Please try again.");
       return;
     }
 
@@ -92,22 +67,28 @@ export default function ProfileSettings() {
 
       cursorY += lineHeight * 1.5;
       doc.setFontSize(12);
-      doc.text(`Blood Bank: ${formData.name || "N/A"}`, 20, cursorY);
+      doc.text(`Blood Bank: ${organization.name || "N/A"}`, 20, cursorY);
       cursorY += lineHeight;
-      doc.text(`License Number: ${formData.licenseNumber || "N/A"}`, 20, cursorY);
+      doc.text(`License Number: ${organization.licenseNumber || "N/A"}`, 20, cursorY);
       cursorY += lineHeight;
-      doc.text(`Verification Status: ${formData.verificationStatus || "PENDING"}`, 20, cursorY);
+      doc.text(
+        `Verification Status: ${
+          formData.verificationStatus || "PENDING"
+        }`,
+        20,
+        cursorY
+      );
       cursorY += lineHeight;
-      doc.text(`Contact Email: ${formData.email || "N/A"}`, 20, cursorY);
+      doc.text(`Contact Email: ${organization.email || "N/A"}`, 20, cursorY);
       cursorY += lineHeight;
-      doc.text(`Phone: ${formData.phone || "N/A"}`, 20, cursorY);
+      doc.text(`Phone: ${organization.phone || "N/A"}`, 20, cursorY);
       cursorY += lineHeight;
-      doc.text(`City: ${formData.city || "N/A"}`, 20, cursorY);
+      doc.text(`City: ${organization.address?.city || "N/A"}`, 20, cursorY);
       cursorY += lineHeight;
       doc.text("Address:", 20, cursorY);
       cursorY += lineHeight;
 
-      const addressText = formData.address || "N/A";
+      const addressText = formattedAddress || "N/A";
       doc.text(doc.splitTextToSize(addressText, 170), 20, cursorY);
       cursorY += lineHeight * 2;
 
@@ -135,67 +116,65 @@ export default function ProfileSettings() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
-    try {
-      if (!bloodBankData?._id) {
-        toast.error("Blood bank ID not found");
-        return;
-      }
+    if (!organization?._id) {
+      toast.error("Organization ID missing. Please reload.");
+      return;
+    }
 
-      const updateData = {
+    try {
+      const response = await updateBloodBank(organization._id, {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         city: formData.city,
         address: formData.address,
         establishedYear: formData.establishedYear,
-      };
+      });
 
-      const response = await updateBloodBank(bloodBankData._id, updateData);
-      
       if (response.data?.success) {
         toast.success("Profile updated successfully");
         setIsEditing(false);
-        // Refresh data
-        fetchBloodBankProfile();
+        refetchOrganization?.();
       } else {
-        toast.error("Failed to update profile");
+        toast.error(response.data?.message || "Failed to update profile");
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error(error.response?.data?.message || "Failed to update profile");
     }
   };
 
   const handleCancel = () => {
-    // Reset form data to original blood bank data
-    if (bloodBankData) {
+    if (organization) {
       setFormData({
-        name: bloodBankData.name || "",
-        licenseNumber: bloodBankData.licenseNumber || "",
-        email: bloodBankData.email || "",
-        phone: bloodBankData.phone || "",
-        city: bloodBankData.address?.city || "",
-        address: bloodBankData.address?.street 
-          ? `${bloodBankData.address.street}, ${bloodBankData.address.city || ""}, ${bloodBankData.address.state || ""} ${bloodBankData.address.pincode || ""}`.trim()
+        name: organization.name || "",
+        licenseNumber: organization.licenseNumber || "",
+        email: organization.email || "",
+        phone: organization.phone || "",
+        city: organization.address?.city || "",
+        address: formattedAddress,
+        verificationStatus:
+          organization.verificationStatus?.status ||
+          organization.status ||
+          "PENDING",
+        establishedYear: organization.licenseIssuedDate
+          ? new Date(organization.licenseIssuedDate)
+              .getFullYear()
+              .toString()
           : "",
-        verificationStatus: bloodBankData.verificationStatus?.status || bloodBankData.status || "PENDING",
-        establishedYear: bloodBankData.licenseIssuedDate 
-          ? new Date(bloodBankData.licenseIssuedDate).getFullYear().toString() 
+        capacity: organization.storageCapacity
+          ? `${organization.storageCapacity} units`
           : "",
-        capacity: bloodBankData.storageCapacity ? `${bloodBankData.storageCapacity} units` : "",
       });
     }
     setIsEditing(false);
   };
 
-  if (loading) {
+  if (!isReady) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">

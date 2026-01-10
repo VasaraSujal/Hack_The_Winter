@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   getBloodBankRequests,
   acceptBloodRequest,
@@ -7,6 +8,7 @@ import {
 } from "../../services/hospitalBloodRequestApi";
 import { getHospitalById } from "../../services/hospitalApi";
 import toast from "react-hot-toast";
+import { getVerificationStatusLabel } from "../../utils/organizationStatus";
 
 
 const statusBadgeStyles = {
@@ -49,8 +51,10 @@ export default function HospitalRequests() {
   const [requestStatusFilter, setRequestStatusFilter] = useState("ALL");
   const [requestUrgencyFilter, setRequestUrgencyFilter] = useState("ALL");
 
-  const verificationStatus = "VERIFIED"; // This would come from context/state in real app
-  const actionsLocked = verificationStatus !== "VERIFIED";
+  const { organization, isVerified } = useOutletContext() || {};
+  const verificationStatus =
+    getVerificationStatusLabel(organization) || (isVerified ? "VERIFIED" : "PENDING");
+  const actionsLocked = !isVerified;
 
   useEffect(() => {
     fetchRequests();

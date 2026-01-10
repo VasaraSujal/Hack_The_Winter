@@ -1,42 +1,63 @@
-import { useState, useEffect } from "react";
-import { getBloodStock, updateBloodStock as updateBloodStockApi } from "../../services/bloodBankApi";
+import { useState, useEffect, useMemo } from "react";
+import { useOutletContext } from "react-router-dom";
+import {
+  getBloodStock,
+  updateBloodStock as updateBloodStockApi,
+} from "../../services/bloodBankApi";
 import toast from "react-hot-toast";
 
+const DEFAULT_GROUPS = [
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "O+",
+  "O-",
+  "AB+",
+  "AB-",
+];
+
 export default function BloodStock() {
+  const { organization } = useOutletContext() || {};
   const [loading, setLoading] = useState(true);
   const [bloodStock, setBloodStock] = useState([]);
   const [editUnits, setEditUnits] = useState({});
   const [updatingGroup, setUpdatingGroup] = useState(null);
   const [bloodBankId, setBloodBankId] = useState("");
 
-  useEffect(() => {
-    fetchBloodStock();
+  const fallbackId = useMemo(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      return (
+        storedUser.organizationId ||
+        storedUser.bloodBankId ||
+        storedUser._id ||
+        storedUser.organization?._id ||
+        ""
+      );
+    } catch {
+      return "";
+    }
   }, []);
 
-  const fetchBloodStock = async () => {
+  useEffect(() => {
+    const resolvedId = organization?._id || fallbackId;
+    if (!resolvedId) {
+      toast.error("Blood bank ID missing. Please login again.");
+      setLoading(false);
+      return;
+    }
+    setBloodBankId(resolvedId);
+    fetchBloodStock(resolvedId);
+  }, [organization, fallbackId]);
+
+  const fetchBloodStock = async (targetId) => {
     try {
       setLoading(true);
-      
-      // Get blood bank ID from localStorage (set during login)
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const bloodBankId =
-        user.organizationId ||
-        user.bloodBankId ||
-        user._id ||
-        user.organization?._id;
+      const response = await getBloodStock(targetId);
 
-      if (!bloodBankId) {
-        toast.error("Blood bank ID not found");
-        return;
-      }
-
-      setBloodBankId(bloodBankId);
-
-      const response = await getBloodStock(bloodBankId);
-      
       if (response.data?.success && response.data?.data) {
         const stockData = response.data.data;
-
         const normalizedStock =
           stockData.bloodStock ||
           stockData.bloodGroups ||
@@ -69,24 +90,20 @@ export default function BloodStock() {
           }, {})
         );
       } else {
-        // If no stock data, show empty state
         setBloodStock([]);
         setEditUnits({});
       }
     } catch (error) {
       console.error("Error fetching blood stock:", error);
       toast.error("Failed to load blood stock data");
-      // Set default blood groups with 0 units
-      setBloodStock([
-        { bloodGroup: "A+", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "A-", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "B+", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "B-", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "O+", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "O-", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "AB+", units: 0, lastUpdated: "N/A" },
-        { bloodGroup: "AB-", units: 0, lastUpdated: "N/A" },
-      ]);
+      setBloodStock(
+        DEFAULT_GROUPS.map((group) => ({
+          bloodGroup: group,
+          units: 0,
+          lastUpdated: "N/A",
+        }))
+      );
+      setEditUnits({});
     } finally {
       setLoading(false);
     }
