@@ -78,7 +78,7 @@ export const getLocationStats = () => api.get("/admin/bloodbanks/stats/location"
  * GET /api/admin/bloodbanks/status/VERIFIED
  */
 export const getVerifiedBloodBanks = () => 
-  api.get("/admin/bloodbanks/status/VERIFIED");
+  api.get("/admin/bloodbanks/status/APPROVED?limit=100");
 
 // ============= ORGANIZATION ROUTES =============
 
