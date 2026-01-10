@@ -473,9 +473,10 @@ export default function SearchBlood() {
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
         onSuccess={() => {
-            toast.success("Blood Request Created Successfully!");
+            toast.success("Blood Request Created Successfully! Check Blood Requests section.");
+            setIsRequestModalOpen(false);
         }}
-        hospitalId={user?._id} // Assuming user object has hospital _id
+        hospitalId={user?.organizationId || localStorage.getItem('organizationId')}
         preSelectedBloodBank={selectedBank}
       />
     </section>
