@@ -160,7 +160,19 @@ class HospitalBloodRequest {
             },
             {
                 $addFields: {
-                    bloodBankId: { $ifNull: ["$bloodBankDetails", "$bloodBankId"] }
+                    bloodBankId: {
+                        $cond: {
+                            if: { $ne: ["$bloodBankDetails", null] },
+                            then: {
+                                _id: "$bloodBankDetails._id",
+                                name: "$bloodBankDetails.name",
+                                organizationCode: "$bloodBankDetails.organizationCode",
+                                city: "$bloodBankDetails.city",
+                                phone: "$bloodBankDetails.phone"
+                            },
+                            else: "$bloodBankId"
+                        }
+                    }
                 }
             },
             {
