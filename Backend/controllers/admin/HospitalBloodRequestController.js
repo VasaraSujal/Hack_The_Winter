@@ -1,5 +1,6 @@
 import HospitalBloodRequest from "../../models/admin/HospitalBloodRequest.js";
 import BloodBank from "../../models/admin/BloodBank.js";
+import PriorityRequestHandler from "../../services/PriorityRequestHandler.js";
 
 /**
  * HospitalBloodRequestController
@@ -9,16 +10,29 @@ import BloodBank from "../../models/admin/BloodBank.js";
 // ============= CREATE REQUEST =============
 export const createRequest = async (req, res) => {
   try {
-    const request = await HospitalBloodRequest.create(req.body);
+    // Get current blood availability
+    const availability = await PriorityRequestHandler.getBloodAvailability(req.body.bloodGroup);
+
+    // Enrich request data with priority calculation
+    const enrichedData = await PriorityRequestHandler.enrichRequestWithPriority(
+      req.body,
+      availability
+    );
+
+    // Create request with priority
+    const request = await HospitalBloodRequest.create(enrichedData);
 
     const message = request.urgency === "CRITICAL"
-      ? "Emergency blood request created. Waiting for admin approval."
-      : "Blood request created successfully.";
+      ? `🚨 Emergency blood request created with ${request.priorityCategory} priority. Waiting for admin approval.`
+      : `✅ Blood request created successfully with ${request.priorityCategory} priority.`;
 
     return res.status(201).json({
       success: true,
       message,
-      data: request
+      data: {
+        ...request,
+        priority: PriorityRequestHandler.formatPriorityForResponse(request)
+      }
     });
   } catch (error) {
     return res.status(500).json({
@@ -586,6 +600,235 @@ export const deleteRequest = async (req, res) => {
   }
 };
 
+// ============= ROUND 2: PRIORITY SYSTEM ENDPOINTS =============
+
+/**
+ * Get priority queue - all pending requests sorted by priority
+ * Used by admin dashboard to see which requests need immediate attention
+ */
+export const getPriorityQueue = async (req, res) => {
+  try {
+    const { limit = 50, bloodGroup, organization } = req.query;
+
+    const filters = {};
+    if (bloodGroup) filters.bloodGroup = bloodGroup;
+    if (organization) filters.organizationId = organization;
+
+    const queue = await PriorityRequestHandler.getPriorityQueue(filters, parseInt(limit));
+
+    return res.status(200).json({
+      success: true,
+      message: "Priority queue retrieved successfully",
+      data: {
+        totalInQueue: queue.length,
+        queue: queue,
+        lastUpdated: new Date()
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving priority queue",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get requests by priority category
+ * Allows filtering for specific urgency levels (CRITICAL, HIGH, etc)
+ */
+export const getByPriorityCategory = async (req, res) => {
+  try {
+    const { category, limit = 50 } = req.query;
+
+    if (!category || !["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(category.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid priority category required: CRITICAL, HIGH, MEDIUM, or LOW"
+      });
+    }
+
+    const requests = await HospitalBloodRequest.getByPriorityCategory(
+      category.toUpperCase(),
+      parseInt(limit)
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Requests with ${category} priority retrieved successfully`,
+      data: {
+        category: category.toUpperCase(),
+        count: requests.length,
+        requests: requests.map(req => ({
+          _id: req._id,
+          requestCode: req.requestCode,
+          hospitalId: req.hospitalId,
+          bloodGroup: req.bloodGroup,
+          unitsRequired: req.unitsRequired,
+          urgency: req.urgency,
+          priority: PriorityRequestHandler.formatPriorityForResponse(req),
+          createdAt: req.createdAt,
+          status: req.status
+        }))
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving requests by priority category",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Recalculate priority for a specific request
+ * Called when blood availability changes significantly
+ */
+export const recalculatePriority = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the request
+    const request = await HospitalBloodRequest.findById(id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Request not found"
+      });
+    }
+
+    // Get current blood availability
+    const availability = await PriorityRequestHandler.getBloodAvailability(request.bloodGroup);
+
+    // Recalculate and update priority
+    const result = await PriorityRequestHandler.recalculateAndUpdatePriority(
+      id,
+      request,
+      availability
+    );
+
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to recalculate priority"
+      });
+    }
+
+    // Get updated request
+    const updatedRequest = await HospitalBloodRequest.findById(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Priority recalculated successfully",
+      data: {
+        oldPriority: {
+          score: request.priorityScore,
+          category: request.priorityCategory
+        },
+        newPriority: result,
+        request: {
+          _id: updatedRequest._id,
+          requestCode: updatedRequest.requestCode,
+          priority: PriorityRequestHandler.formatPriorityForResponse(updatedRequest)
+        }
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error recalculating priority",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get priority dashboard statistics
+ * Shows overview of all requests by priority category
+ */
+export const getPriorityDashboard = async (req, res) => {
+  try {
+    const stats = await PriorityRequestHandler.getPriorityDashboardStats();
+
+    return res.status(200).json({
+      success: true,
+      message: "Priority dashboard statistics retrieved successfully",
+      data: stats,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving priority dashboard",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Batch recalculate all priorities
+ * Usually called on a schedule or when blood stock changes significantly
+ * Admin only endpoint
+ */
+export const batchRecalculatePriorities = async (req, res) => {
+  try {
+    const adminId = req.admin?._id;
+
+    if (!adminId) {
+      return res.status(401).json({
+        success: false,
+        message: "Admin authentication required"
+      });
+    }
+
+    const result = await PriorityRequestHandler.batchRecalculatePriorities();
+
+    return res.status(200).json({
+      success: true,
+      message: "Batch priority recalculation completed",
+      data: result
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error in batch priority recalculation",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get priority system validation info
+ * Shows weights, valid urgencies, and configuration
+ */
+export const getPriorityConfiguration = async (req, res) => {
+  try {
+    const validation = PriorityRequestHandler.validateConfiguration();
+
+    return res.status(200).json({
+      success: true,
+      message: "Priority system configuration retrieved",
+      data: {
+        isValid: validation.isValid,
+        weights: validation.weights,
+        totalWeight: validation.totalWeight,
+        validUrgencies: validation.validUrgencies,
+        validBloodGroups: validation.validBloodGroups,
+        error: validation.error || null
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving priority configuration",
+      error: error.message
+    });
+  }
+};
+
 export default {
   createRequest,
   getAllRequests,
@@ -604,5 +847,12 @@ export default {
   addCommunicationLog,
   getRequestStatistics,
   getAverageResponseTime,
-  deleteRequest
+  deleteRequest,
+  // Priority system endpoints
+  getPriorityQueue,
+  getByPriorityCategory,
+  recalculatePriority,
+  getPriorityDashboard,
+  batchRecalculatePriorities,
+  getPriorityConfiguration
 };
