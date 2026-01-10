@@ -6,7 +6,6 @@ const navItems = [
   { label: "Dashboard Overview", path: "/bloodbank/overview" },
   { label: "Hospital Requests", path: "/bloodbank/hospital-requests" },
   { label: "NGO Drives", path: "/bloodbank/ngo-drives" },
-  { label: "Resource Requests", path: "/bloodbank/resource-requests" }, // New Item
   { label: "Blood Stock", path: "/bloodbank/blood-stock" },
   { label: "Admin Messages", path: "/bloodbank/admin-messages" },
   { label: "Profile & Settings", path: "/bloodbank/profile-settings" },
