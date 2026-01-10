@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  BloodBankDashboardProvider,
+  useBloodBankDashboard,
+} from "../context/BloodBankDashboardContext";
+import {
+  getVerificationStatusLabel,
+  isOrganizationVerified,
+} from "../utils/organizationStatus";
 
 const navItems = [
   { label: "Dashboard Overview", path: "/bloodbank/overview" },
@@ -14,20 +22,36 @@ const navItems = [
 const statusBadgeStyles = {
   VERIFIED:
     "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
+  APPROVED:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
+  ACTIVE:
+    "bg-[#ecf8ef] text-[#1f7a3a] border border-[#a2d8b3] shadow-[0_3px_12px_rgba(31,122,58,0.18)]",
   PENDING:
     "bg-[#fff3e4] text-[#b05f09] border border-[#f0c18c] shadow-[0_3px_12px_rgba(219,149,58,0.2)]",
   SUSPENDED:
     "bg-[#fde4e4] text-[#9e121c] border border-[#f5a5ad] shadow-[0_3px_12px_rgba(181,39,57,0.25)]",
 };
 
-export default function BloodBankLayout() {
+function LayoutShell() {
   const location = useLocation();
-  const { logout, user } = useAuth(); // ✅ Get user from AuthContext
+  const { logout, user } = useAuth();
+  const {
+    organization,
+    organizationLoading,
+    organizationError,
+    refetchOrganization,
+  } = useBloodBankDashboard();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // ✅ Use real user data from AuthContext
-  const organizationName = user?.organizationName || user?.name || "Blood Bank";
-  const verificationStatus = user?.verificationStatus || "VERIFIED";
+  const organizationName =
+    organization?.name || user?.organizationName || user?.name || "Blood Bank";
+  const organizationCode =
+    organization?.organizationCode || user?.organizationCode || "Blood Bank";
+  const verificationStatus =
+    getVerificationStatusLabel(organization) ||
+    user?.verificationStatus ||
+    "PENDING";
+  const isVerified = isOrganizationVerified(organization);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -96,15 +120,17 @@ export default function BloodBankLayout() {
                 </button>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-[#ff4d6d] font-medium">
-                    {user?.organizationCode || "Blood Bank"}
+                    {organizationCode}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-[#31101e]">
                       {organizationName}
                     </h2>
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeStyles[verificationStatus]
-                        }`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        statusBadgeStyles[verificationStatus] ||
+                        statusBadgeStyles.PENDING
+                      }`}
                     >
                       {verificationStatus}
                     </span>
@@ -134,12 +160,18 @@ export default function BloodBankLayout() {
 
           {/* Main Content Area - Nested Routes Render Here */}
           <main className="flex-1 px-4 py-8 md:px-10">
-            {verificationStatus !== "VERIFIED" && (
+            {organizationError && (
+              <div className="mb-6 rounded-3xl border border-[#f5a5ad]/60 bg-[#ffe5ec] px-6 py-4 text-sm font-semibold text-[#9e121c]">
+                {organizationError}
+              </div>
+            )}
+            {!organizationLoading && !organizationError && !isVerified && (
               <div
-                className={`mb-6 rounded-3xl border px-6 py-4 text-sm font-semibold ${verificationStatus === "SUSPENDED"
-                  ? "border-[#ff4d6d]/40 bg-[#ffe2eb]"
-                  : "border-[#f8c37b]/60 bg-[#fff5e7]"
-                  }`}
+                className={`mb-6 rounded-3xl border px-6 py-4 text-sm font-semibold ${
+                  verificationStatus === "SUSPENDED"
+                    ? "border-[#ff4d6d]/40 bg-[#ffe2eb]"
+                    : "border-[#f8c37b]/60 bg-[#fff5e7]"
+                }`}
               >
                 {verificationStatus === "SUSPENDED"
                   ? "Account suspended — operations locked until HQ reinstates the profile."
@@ -147,14 +179,28 @@ export default function BloodBankLayout() {
               </div>
             )}
 
-            <Outlet />
+            {organizationLoading ? (
+              <div className="flex min-h-[200px] items-center justify-center rounded-3xl border border-white/70 bg-white/90">
+                <div className="text-center">
+                  <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#ff4d6d]" />
+                  <p className="mt-4 text-sm font-semibold text-[#7c4a5e]">
+                    Loading dashboard...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <Outlet
+                context={{ organization, isVerified, refetchOrganization }}
+              />
+            )}
           </main>
         </div>
       </div>
 
       <div
-        className={`fixed inset-0 z-40 lg:hidden transition ${drawerOpen ? "pointer-events-auto" : "pointer-events-none"
-          }`}
+        className={`fixed inset-0 z-40 lg:hidden transition ${
+          drawerOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
       >
         <div
           className={`absolute inset-0 bg-black/40 transition-opacity ${drawerOpen ? "opacity-100" : "opacity-0"
@@ -182,5 +228,13 @@ export default function BloodBankLayout() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BloodBankLayout() {
+  return (
+    <BloodBankDashboardProvider>
+      <LayoutShell />
+    </BloodBankDashboardProvider>
   );
 }
