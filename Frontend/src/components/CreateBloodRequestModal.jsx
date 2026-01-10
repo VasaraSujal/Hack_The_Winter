@@ -5,14 +5,14 @@ import { createBloodRequest } from "../services/hospitalBloodRequestApi";
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const URGENCY_LEVELS = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 
-export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, hospitalId }) {
+export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, hospitalId, preSelectedBloodBank }) {
   const [bloodBanks, setBloodBanks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
-    bloodBankId: "",
+    bloodBankId: preSelectedBloodBank?._id || "",
     bloodGroup: "",
     unitsRequired: "",
     urgency: "MEDIUM",
@@ -23,16 +23,26 @@ export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, ho
 
   useEffect(() => {
     if (isOpen) {
+      if (preSelectedBloodBank) {
+         setFormData(prev => ({ ...prev, bloodBankId: preSelectedBloodBank._id }));
+      }
       fetchBloodBanks();
     }
-  }, [isOpen]);
+  }, [isOpen, preSelectedBloodBank]);
 
   const fetchBloodBanks = async () => {
     try {
       setLoading(true);
       setError(null);
       const response = await getVerifiedBloodBanks();
-      setBloodBanks(response.data.data || []);
+      let banks = response.data.data?.bloodBanks || [];
+      
+      // If we have a pre-selected bank, ensure it is in the list so the label shows up
+      if (preSelectedBloodBank && !banks.find(b => b._id === preSelectedBloodBank._id)) {
+          banks = [preSelectedBloodBank, ...banks];
+      }
+      
+      setBloodBanks(banks);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching blood banks:', err);
@@ -153,12 +163,13 @@ export default function CreateBloodRequestModal({ isOpen, onClose, onSuccess, ho
                 value={formData.bloodBankId}
                 onChange={handleChange}
                 required
-                className="w-full rounded-xl border border-[#f3c9c0] bg-white px-4 py-3 text-[#2f1012] focus:border-[#8f0f1a] focus:outline-none focus:ring-2 focus:ring-[#8f0f1a]/20"
+                disabled={!!preSelectedBloodBank}
+                className={`w-full rounded-xl border border-[#f3c9c0] bg-white px-4 py-3 text-[#2f1012] focus:border-[#8f0f1a] focus:outline-none focus:ring-2 focus:ring-[#8f0f1a]/20 ${preSelectedBloodBank ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               >
                 <option value="">-- Choose a Blood Bank --</option>
                 {bloodBanks.map((bank) => (
                   <option key={bank._id} value={bank._id}>
-                    {bank.name} - {bank.city}, {bank.state}
+                    {bank.name} - {bank.address?.city || bank.city}, {bank.address?.state || bank.state}
                   </option>
                 ))}
               </select>
