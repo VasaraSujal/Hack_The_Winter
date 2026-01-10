@@ -113,7 +113,10 @@ export class HospitalController {
             let results = await Organization.searchBloodStock(
                 bloodType,
                 minUnits || 1,
-                city
+                city,
+                latitude,
+                longitude,
+                radius
             );
 
             let source = 'bloodbank';
@@ -124,20 +127,20 @@ export class HospitalController {
                 const db = getDB();
 
                 let donorQuery = { bloodGroup: bloodType };
+                let usedGeo = false;
 
-                // Geospatial Search if coordinates are provided
+                // Attempt Geospatial Search Setup
                 if (latitude && longitude) {
-                    const searchRadiusKm = parseInt(radius) || 5;
-                    const searchRadiusMeters = searchRadiusKm * 1000;
-
-                    console.log(`[BLOOD_SEARCH] Using Geospatial Search. Center: [${longitude}, ${latitude}], Radius: ${searchRadiusKm}km`);
-
-                    // Ensure Index Exists (Idempotent)
+                    // Ensure Index Exists (Best Effort)
                     try {
                         await db.collection("donors").createIndex({ location: "2dsphere" });
                     } catch (idxError) {
-                        console.warn("Failed to create geospatial index:", idxError.message);
+                        console.warn("Failed to create geospatial index on donors:", idxError.message);
                     }
+
+                    const searchRadiusKm = parseInt(radius) || 5;
+                    const searchRadiusMeters = searchRadiusKm * 1000;
+                    console.log(`[BLOOD_SEARCH] Using Geospatial Search. Center: [${longitude}, ${latitude}], Radius: ${searchRadiusKm}km`);
 
                     donorQuery.location = {
                         $near: {
@@ -148,14 +151,34 @@ export class HospitalController {
                             $maxDistance: searchRadiusMeters
                         }
                     };
-                } else if (city) {
-                    // Fallback to City Search
+                    usedGeo = true;
+                }
+
+                // Fallback setup if no geo
+                else if (city) {
                     console.log(`[BLOOD_SEARCH] Using City Search: ${city}`);
                     donorQuery.city = new RegExp(city, "i");
                 }
 
-                // Fetch donors
-                results = await db.collection("donors").find(donorQuery).toArray();
+                // Execute Query with Safe Fallback
+                try {
+                    results = await db.collection("donors").find(donorQuery).toArray();
+                } catch (queryError) {
+                    if (usedGeo) {
+                        console.warn("Donor Geospatial Query failed (likely index issue). Falling back to City Search.", queryError.message);
+                        // Retry with City Search
+                        delete donorQuery.location;
+                        if (city) {
+                            donorQuery.city = new RegExp(city, "i");
+                            results = await db.collection("donors").find(donorQuery).toArray();
+                        } else {
+                            results = []; // No city to fallback to
+                        }
+                    } else {
+                        throw queryError; // valid error if not geo related
+                    }
+                }
+
                 source = 'donor';
                 console.log(`[BLOOD_SEARCH] Found ${results.length} donors.`);
             }
