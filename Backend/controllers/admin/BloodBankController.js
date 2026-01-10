@@ -11,7 +11,7 @@ import BloodStock from "../../models/admin/BloodStock.js";
 export const registerBloodBank = async (req, res) => {
   try {
     const bloodBank = await BloodBank.create(req.body);
-    
+
     return res.status(201).json({
       success: true,
       message: "Blood bank registered successfully. Waiting for admin verification.",
@@ -143,7 +143,7 @@ export const getBloodBanksByStatus = async (req, res) => {
     }
 
     // Validate status
-    const validStatuses = ["PENDING", "VERIFIED", "REJECTED", "SUSPENDED"];
+    const validStatuses = ["PENDING", "VERIFIED", "REJECTED", "SUSPENDED", "APPROVED"];
     if (!validStatuses.includes(status.toUpperCase())) {
       return res.status(400).json({
         success: false,
