@@ -107,14 +107,20 @@ graph TB
     Hospital["Hospital"]
     ReqForm["Blood Request<br/>Type, Quantity, Urgency"]
     ReqDB[("Request Database")]
+    
+    Priority["Priority Calculator<br/>(Round 2)<br/>Urgency + Rarity Score"]
+    Queue["Priority Queue<br/>(Round 2)"]
     Search["Search Engine<br/>Radius-Based"]
     BBStock[("Blood Bank Stock Database")]
     
-    Check{"Blood Found?"}
-    Expand["Expand Search Radius"]
+    R1["Radius 1<br/>5 KM"]
+    Check1{"Blood<br/>Found?"}
+    R2["Radius 2<br/>15 KM (Round 2)"]
+    Check2{"Blood<br/>Found?"}
+    R3["Radius 3<br/>50 KM (Round 2)"]
+    Check3{"Blood<br/>Found?"}
     
-    NGOCheck{"Still Not Found?"}
-    NGOFallback["NGO Fallback<br/>Donor List"]
+    NGOFallback["NGO Fallback<br/>Smart Matching (Round 2)"]
     NGODb[("NGO Donor Database")]
     
     Result["Return Results<br/>Available Options"]
@@ -123,34 +129,45 @@ graph TB
     
     Hospital -->|Creates| ReqForm
     ReqForm -->|Store| ReqDB
-    ReqForm -->|Trigger| Search
+    ReqForm -->|Trigger| Priority
     
-    Search -->|Query| BBStock
-    BBStock -->|Check| Check
+    Priority -->|Calculate Score| Queue
+    Queue -->|Process| Search
     
-    Check -->|Yes| Result
-    Check -->|No| Expand
+    Search -->|Query| R1
+    R1 -->|Check| BBStock
+    BBStock -->|Validate| Check1
     
-    Expand -->|Re-search| BBStock
-    Check -->|Still No| NGOCheck
-    NGOCheck -->|Yes| NGOFallback
-    NGOFallback -->|Query| NGODb
+    Check1 -->|Yes| Result
+    Check1 -->|No| R2
+    
+    R2 -->|Expand Search| BBStock
+    BBStock -->|Validate| Check2
+    Check2 -->|Yes| Result
+    Check2 -->|No| R3
+    
+    R3 -->|Expand Search| BBStock
+    BBStock -->|Validate| Check3
+    Check3 -->|Yes| Result
+    Check3 -->|No| NGOFallback
+    
+    NGOFallback -->|Smart Match| NGODb
     NGODb -->|Donor List| Result
-    NGOCheck -->|No| Result
     
     Result -->|Log| AuditLog
     Result -->|Notify| Notification
     
     style Hospital fill:#ff9800,stroke:#333,stroke-width:2px,color:#fff
     style ReqForm fill:#ff9800,stroke:#333,stroke-width:2px
-    style ReqDB fill:#4ecdc4,stroke:#333,stroke-width:2px,color:#fff
-    style Search fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
-    style BBStock fill:#4ecdc4,stroke:#333,stroke-width:2px,color:#fff
-    style Check fill:#ffc107,stroke:#333,stroke-width:2px,color:#000
-    style Expand fill:#ff6b6b,stroke:#333,stroke-width:2px,color:#fff
-    style NGOCheck fill:#ffc107,stroke:#333,stroke-width:2px,color:#000
+    style Priority fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
+    style Queue fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
+    style R1 fill:#4caf50,stroke:#333,stroke-width:2px,color:#fff
+    style R2 fill:#ff9800,stroke:#333,stroke-width:2px,color:#fff
+    style R3 fill:#ff6b6b,stroke:#333,stroke-width:2px,color:#fff
+    style Check1 fill:#ffc107,stroke:#333,stroke-width:2px,color:#000
+    style Check2 fill:#ffc107,stroke:#333,stroke-width:2px,color:#000
+    style Check3 fill:#ffc107,stroke:#333,stroke-width:2px,color:#000
     style NGOFallback fill:#9c27b0,stroke:#333,stroke-width:2px,color:#fff
-    style NGODb fill:#4ecdc4,stroke:#333,stroke-width:2px,color:#fff
     style Result fill:#4caf50,stroke:#333,stroke-width:2px,color:#fff
     style AuditLog fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
     style Notification fill:#9c27b0,stroke:#333,stroke-width:2px,color:#fff
@@ -264,9 +281,9 @@ graph TB
     
     Escalation["Escalation Signal<br/>Blood Unavailable from Blood Banks"]
     
-    Search["Search Donors<br/>Near Emergency Location"]
-    Query["Query Available<br/>Donors by Location"]
-    List["Donor Contact<br/>List & Details"]
+    Search["Search Donors<br/>Smart Matching (Round 2)<br/>Location + Blood Type + Health"]
+    Query["Query Available<br/>Donors by Criteria"]
+    List["Prioritized Donor<br/>Contact List (Round 2)"]
     
     Contact["Contact Donors<br/>Emergency Appeal"]
     Volunteer["Donors Respond<br/>Willing to Help"]
@@ -278,9 +295,9 @@ graph TB
     NGO -->|Manages| Camp
     Camp -->|Store| DonorDB
     
-    Escalation -->|Trigger| Search
+    Escalation -->|Trigger Smart Match| Search
     Search -->|Query| Query
-    Query -->|Check| DonorDB
+    Query -->|Filter & Prioritize| DonorDB
     DonorDB -->|Return| List
     
     List -->|Execute| Contact
@@ -296,7 +313,7 @@ graph TB
     style Escalation fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
     style Search fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
     style Query fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
-    style List fill:#2196f3,stroke:#333,stroke-width:2px,color:#fff
+    style List fill:#00bcd4,stroke:#333,stroke-width:2px,color:#fff
     style Contact fill:#ff6b6b,stroke:#333,stroke-width:2px,color:#fff
     style Volunteer fill:#4caf50,stroke:#333,stroke-width:2px,color:#fff
     style Collection fill:#8bc34a,stroke:#333,stroke-width:2px,color:#fff
@@ -320,10 +337,12 @@ graph TB
     subgraph Platform["SEBN Platform"]
         API["API Layer"]
         Auth["Authentication"]
+        Priority["Priority Engine<br/>(Round 2)"]
         Search["Search Engine"]
         Escalation["Escalation Logic"]
         Notification["Notification"]
         Audit["Audit System"]
+        Dashboard["Admin Dashboard<br/>(Round 2)"]
     end
     
     subgraph Database["Databases"]
@@ -340,14 +359,15 @@ graph TB
     SA -->|Actions| API
     
     API -->|Validate| Auth
-    Auth -->|Route| Search
+    Auth -->|Route| Priority
+    Priority -->|Score & Queue| Search
     Auth -->|Route| Escalation
     Auth -->|Route| Notification
     Auth -->|Route| Audit
+    Auth -->|Route| Dashboard
     
     Search -->|Query| StockDB
     Search -->|Query| DonorDB
-    
     Escalation -->|Expand| Search
     
     API -->|Store| ReqDB
@@ -357,12 +377,15 @@ graph TB
     
     Search -->|Log| AuditDB
     Escalation -->|Log| AuditDB
+    Priority -->|Log| AuditDB
     Audit -->|Query| AuditDB
+    Dashboard -->|Query| AuditDB
     
     Notification -->|Alert| H
     Notification -->|Alert| BB
     Notification -->|Alert| NGO
     
+    Dashboard -->|Report| SA
     Audit -->|Report| SA
     
     style Users fill:#1a4d7a,stroke:#000,stroke-width:3px,color:#fff
@@ -374,9 +397,11 @@ graph TB
     style SA fill:#f44336,stroke:#000,stroke-width:2px,color:#fff
     style API fill:#2196f3,stroke:#000,stroke-width:2px,color:#fff
     style Auth fill:#2196f3,stroke:#000,stroke-width:2px,color:#fff
+    style Priority fill:#00bcd4,stroke:#000,stroke-width:2px,color:#fff
     style Search fill:#2196f3,stroke:#000,stroke-width:2px,color:#fff
     style Escalation fill:#ff6b6b,stroke:#000,stroke-width:2px,color:#fff
     style Notification fill:#9c27b0,stroke:#000,stroke-width:2px,color:#fff
+    style Dashboard fill:#00bcd4,stroke:#000,stroke-width:2px,color:#fff
     style Audit fill:#f44336,stroke:#000,stroke-width:2px,color:#fff
     style ReqDB fill:#00bcd4,stroke:#000,stroke-width:2px,color:#fff
     style StockDB fill:#00bcd4,stroke:#000,stroke-width:2px,color:#fff
