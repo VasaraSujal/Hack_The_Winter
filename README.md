@@ -1,6 +1,6 @@
 # Smart Emergency Blood Network (SEBN)
 
-> A governed digital network that connects hospitals, blood banks, and NGOs to enable fast, reliable, and auditable blood access during emergency and critical conditions.
+A governed digital network that connects hospitals, blood banks, and NGOs to enable fast, reliable, and auditable blood access during emergency and critical conditions.
 
 ---
 
@@ -337,6 +337,7 @@ This repository includes multiple focused documentation files. **Click on any fi
 
 | Document | Purpose |
 |----------|---------|
+| [**RESEARCH.md**](Main%20Documentation/RESEARCH.md) | Complete research, market analysis, statistics, and system overview |
 | [**SYSTEM_FLOW.md**](Main%20Documentation/SYSTEM_FLOW.md) | Detailed flow charts and DFDs |
 | [**ARCHITECTURE.md**](Main%20Documentation/Architecture.md) | Backend architecture and module design |
 | [**DATA_MODEL.md**](Main%20Documentation/DATA_MODEL.md) | Database schemas and relationships |
@@ -346,15 +347,26 @@ This repository includes multiple focused documentation files. **Click on any fi
 
 ---
 
-## Team Contributions
+## 👥 Team Contributions
 
-| Role | Responsibility |
-|------|-----------------|
-| **System Architecture & Backend Design** | Core workflows, escalation logic, API design |
-| **Documentation & Diagrams** | System flows, governance model, Round 2 planning |
-| **Research & Validation** | Emergency workflows, feasibility analysis, scope definition |
+### Team Members
 
-> Work was divided with clear ownership while maintaining collaborative design decisions.
+| Team Member | Role | GitHub Profile | Responsibilities |
+|-------------|------|----------------|------------------|
+| **Jatin Rajvani** | Team Leader & Admin Module | [@JatinRajvani](https://github.com/JatinRajvani) | System Architecture, Admin Module Development, Backend Design, Core Workflows, Escalation Logic, API Design, Team Coordination |
+| **Sujal Vasara** | Hospital Module Lead | [@VasaraSujal](https://github.com/VasaraSujal) | Hospital Dashboard, Emergency Request Workflow, Frontend Development, Documentation & Diagrams, System Flows |
+| **Dhruv Sonagra** | Blood Bank Module Lead | [@dhruv2311-dot](https://github.com/dhruv2311-dot) | Blood Bank Dashboard, Stock Management System, Inventory Tracking, Blood Bank API Integration, Real-time Updates |
+| **Prem Kambaliya** | NGO Module Lead | [@Premkambaliya](https://github.com/Premkambaliya) | NGO Dashboard, Donor Management, Donation Camp Coordination, Fallback Donor Network, NGO API Development |
+
+### Collaborative Work Areas
+
+- **System Design & Architecture**: Collaborative design decisions across all modules with regular team discussions
+- **Research & Validation**: Emergency workflows analysis, feasibility studies, scope definition, and market research
+- **Documentation**: System flows, governance model, technical documentation, and Round 2 planning
+- **Testing & Integration**: Cross-module testing, API integration, and end-to-end workflow validation
+- **Code Reviews**: Peer reviews and quality assurance across all modules
+
+> **Note:** Work was divided with clear ownership while maintaining collaborative design decisions and regular team coordination. Each member contributed to their primary module while supporting others in cross-functional areas.
 
 ---
 
