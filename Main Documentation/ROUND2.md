@@ -1,4 +1,4 @@
-# Round 2 Roadmap: Smart Emergency Blood Network (SEBN) - The Slingshot
+# Round 2 (The SlingShot): Smart Emergency Blood Network (SEBN) - The Slingshot
 
 > This document outlines planned enhancements for Round 2 of SEBN, focusing on operational maturity and reliability.
 
