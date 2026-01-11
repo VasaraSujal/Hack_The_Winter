@@ -12,10 +12,8 @@ A governed digital network that connects hospitals, blood banks, and NGOs to ena
 4. [Key Differentiators](#key-differentiators-usp)
 5. [Stakeholders & Roles](#stakeholders--roles)
 6. [Technology Stack](#technology-stack)
-7. [Documentation Structure](#documentation-structure)
-8. [Current Status](#current-status-round-1)
-9. [Impact & Future Vision](#impact--future-vision)
-10. [References](#-references)
+7. [Impact & Future Vision](#impact--future-vision)
+8. [References](#-references)
 
 ---
 
