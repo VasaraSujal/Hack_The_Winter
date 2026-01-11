@@ -9,6 +9,8 @@ import {
 import { getHospitalById } from "../../services/hospitalApi";
 import RequestDetailModal from "../../components/RequestDetailModal";
 import RejectionReasonModal from "../../components/RejectionReasonModal";
+import AcceptRequestModal from "../../components/AcceptRequestModal";
+import DistanceResultModal from "../../components/DistanceResultModal";
 import toast from "react-hot-toast";
 import { getVerificationStatusLabel } from "../../utils/organizationStatus";
 
@@ -55,6 +57,8 @@ export default function HospitalRequests() {
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [rejectionModal, setRejectionModal] = useState({ isOpen: false, request: null });
+  const [acceptModal, setAcceptModal] = useState({ isOpen: false, request: null });
+  const [distanceResultModal, setDistanceResultModal] = useState({ isOpen: false, distanceInfo: null, hospitalDetails: null });
   const [actionsLocked, setActionsLocked] = useState(false);
 
   const { organization, isVerified } = useOutletContext() || {};
@@ -161,54 +165,104 @@ export default function HospitalRequests() {
       return;
     }
 
-    // If rejecting, show rejection reason modal instead
+    // If rejecting, show rejection reason modal
     if (nextStatus === "REJECTED") {
       setRejectionModal({ isOpen: true, request });
       return;
     }
 
-    setActionsLocked(true);
+    // If accepting, show accept confirmation modal
+    if (nextStatus === "ACCEPTED") {
+      setAcceptModal({ isOpen: true, request });
+      return;
+    }
 
-    try {
-      let response;
+    // Handle COMPLETED status
+    if (nextStatus === "COMPLETED") {
+      const confirmed = window.confirm("Mark this request as completed?");
+      if (!confirmed) return;
 
-      if (nextStatus === "ACCEPTED") {
-        response = await acceptBloodRequest(
-          request._id,
-          { bloodBankResponse: "Accepted via dashboard" },
-          token
-        );
-      } else if (nextStatus === "COMPLETED") {
-        const unitsFulfilled =
-          request.unitsFulfilled || request.unitsRequired || 0;
-        response = await completeBloodRequest(
+      setActionsLocked(true);
+      try {
+        const unitsFulfilled = request.unitsFulfilled || request.unitsRequired || 0;
+        const response = await completeBloodRequest(
           request._id,
           { unitsFulfilled },
           token
         );
-      } else {
-        toast.error("Unsupported action");
+
+        if (response.data?.success) {
+          const updatedRequest = response.data?.data;
+          setRequests((prev) =>
+            prev.map((req) =>
+              req._id === request._id ? updatedRequest : req
+            )
+          );
+          toast.success("Request marked as completed successfully");
+          fetchRequests();
+        } else {
+          toast.error("Failed to complete request");
+        }
+      } catch (error) {
+        console.error("Error completing request:", error);
+        toast.error(error.response?.data?.message || "Failed to complete request");
+      } finally {
         setActionsLocked(false);
-        return;
       }
+    }
+  };
+
+  // Handle accept confirmation from modal
+  const handleAcceptConfirm = async (responseMessage) => {
+    if (!acceptModal.request) return;
+
+    setActionsLocked(true);
+    try {
+      const response = await acceptBloodRequest(
+        acceptModal.request._id,
+        { bloodBankResponse: responseMessage || "Accepted via dashboard" },
+        localStorage.getItem("token")
+      );
 
       if (response.data?.success) {
         const updatedRequest = response.data?.data;
+        
+        // Update requests list
         setRequests((prev) =>
           prev.map((req) =>
-            req._id === request._id
-              ? updatedRequest || { ...req, status: updatedRequest?.status || nextStatus }
-              : req
+            req._id === acceptModal.request._id ? updatedRequest : req
           )
         );
-        toast.success(`Request ${nextStatus.toLowerCase()} successfully`);
+
+        // Close accept modal
+        setAcceptModal({ isOpen: false, request: null });
+
+        // Show distance result modal
+        if (response.data?.distanceInfo || response.data?.distanceError) {
+          setDistanceResultModal({
+            isOpen: true,
+            distanceInfo: response.data.distanceInfo,
+            hospitalDetails: response.data.hospitalDetails,
+            distanceError: response.data.distanceError
+          });
+        } else {
+          toast.success("Request accepted successfully!");
+        }
+
+        // Refresh requests
         fetchRequests();
       } else {
-        toast.error("Failed to update request status");
+        toast.error(response.data?.message || "Failed to accept request");
       }
     } catch (error) {
-      console.error("Error updating request status:", error);
-      toast.error("Failed to update request status");
+      console.error("Error accepting request:", error);
+      const errorMessage = error.response?.data?.message || "Failed to accept request";
+      toast.error(errorMessage);
+      
+      // Show detailed error if hospital not found
+      if (errorMessage.includes("Hospital not found")) {
+        toast.error("Hospital data not found in database. Please check hospital registration.", { duration: 5000 });
+      }
     } finally {
       setActionsLocked(false);
     }
@@ -441,6 +495,23 @@ export default function HospitalRequests() {
       onClose={() => setRejectionModal({ isOpen: false, request: null })}
       onConfirm={handleRejectWithReason}
       requestCode={rejectionModal.request?.requestCode || "N/A"}
+    />
+
+    {/* Accept Request Modal */}
+    <AcceptRequestModal
+      isOpen={acceptModal.isOpen}
+      onClose={() => setAcceptModal({ isOpen: false, request: null })}
+      onConfirm={handleAcceptConfirm}
+      request={acceptModal.request}
+      isProcessing={actionsLocked}
+    />
+
+    {/* Distance Result Modal */}
+    <DistanceResultModal
+      isOpen={distanceResultModal.isOpen}
+      onClose={() => setDistanceResultModal({ isOpen: false, distanceInfo: null, hospitalDetails: null })}
+      distanceInfo={distanceResultModal.distanceInfo}
+      hospitalDetails={distanceResultModal.hospitalDetails}
     />
     </>
   );

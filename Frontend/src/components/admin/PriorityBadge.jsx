@@ -32,53 +32,46 @@ const PriorityBadge = ({
   
   // Ensure category is a string
   const safeCategory = typeof category === 'string' ? category : 'MEDIUM';
-  // Color and icon mapping for each priority level
+  
+  // Color and icon mapping for each priority level - Website Theme
   const priorityConfig = {
     CRITICAL: {
-      bgColor: 'bg-red-100',
+      bgColor: 'bg-gradient-to-br from-red-50 to-rose-100',
       textColor: 'text-red-900',
       borderColor: 'border-red-300',
       icon: '🔴',
       emoji: '⚠️',
       label: 'Critical',
-      bgDark: 'dark:bg-red-900',
-      textDark: 'dark:text-red-100',
       pulse: 'animate-pulse',
       badge: 'badge-critical'
     },
     HIGH: {
-      bgColor: 'bg-orange-100',
+      bgColor: 'bg-gradient-to-br from-orange-50 to-amber-100',
       textColor: 'text-orange-900',
       borderColor: 'border-orange-300',
       icon: '🟠',
       emoji: '🔥',
       label: 'High',
-      bgDark: 'dark:bg-orange-900',
-      textDark: 'dark:text-orange-100',
       pulse: '',
       badge: 'badge-high'
     },
     MEDIUM: {
-      bgColor: 'bg-yellow-100',
+      bgColor: 'bg-gradient-to-br from-yellow-50 to-amber-50',
       textColor: 'text-yellow-900',
       borderColor: 'border-yellow-300',
       icon: '🟡',
       emoji: '⏳',
       label: 'Medium',
-      bgDark: 'dark:bg-yellow-900',
-      textDark: 'dark:text-yellow-100',
       pulse: '',
       badge: 'badge-medium'
     },
     LOW: {
-      bgColor: 'bg-green-100',
+      bgColor: 'bg-gradient-to-br from-green-50 to-emerald-100',
       textColor: 'text-green-900',
       borderColor: 'border-green-300',
       icon: '🟢',
       emoji: '✅',
       label: 'Low',
-      bgDark: 'dark:bg-green-900',
-      textDark: 'dark:text-green-100',
       pulse: '',
       badge: 'badge-low'
     }
@@ -87,7 +80,7 @@ const PriorityBadge = ({
   // Size configuration
   const sizeConfig = {
     small: {
-      padding: 'px-2 py-1',
+      padding: 'px-2.5 py-1',
       fontSize: 'text-xs',
       icon: 'text-sm'
     },
@@ -110,15 +103,16 @@ const PriorityBadge = ({
     <div
       className={`
         inline-flex items-center gap-1.5
-        rounded-full border
+        rounded-full border-2
         ${sizeClass.padding}
-        ${config.bgColor} ${config.bgDark}
-        ${config.textColor} ${config.textDark}
+        ${config.bgColor}
+        ${config.textColor}
         ${config.borderColor}
-        font-semibold
+        font-bold
         ${sizeClass.fontSize}
-        ${clickable ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
+        ${clickable ? 'cursor-pointer hover:shadow-lg transition-all hover:scale-105' : ''}
         ${config.pulse}
+        shadow-sm
         ${className}
       `}
       onClick={onClick}
@@ -138,7 +132,7 @@ const PriorityBadge = ({
 
       {/* Score */}
       {showScore && (
-        <span className="text-xs opacity-75">
+        <span className="text-xs opacity-75 font-semibold">
           ({safeScore})
         </span>
       )}
@@ -166,7 +160,7 @@ export default PriorityBadge;
  */
 export const PriorityInfo = ({ priorityData, compact = false }) => {
   if (!priorityData) {
-    return <div className="text-gray-500">No priority data</div>;
+    return <div className="text-[#7c4a5e]">No priority data</div>;
   }
 
   const { score, category, breakdown, calculatedAt, actionRequired } = priorityData;
@@ -175,7 +169,7 @@ export const PriorityInfo = ({ priorityData, compact = false }) => {
     return (
       <div className="flex items-center gap-2">
         <PriorityBadge score={score} category={category} size="small" />
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-[#8a5c70]">
           {new Date(calculatedAt).toLocaleTimeString()}
         </span>
       </div>
@@ -183,26 +177,26 @@ export const PriorityInfo = ({ priorityData, compact = false }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+    <div className="rounded-3xl border border-white/80 bg-white/95 p-5 shadow-[0_25px_60px_rgba(241,122,146,0.18)]">
       {/* Header with badge */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Priority Details</h3>
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-pink-100">
+        <h3 className="text-lg font-bold text-[#31101e]">Priority Details</h3>
         <PriorityBadge score={score} category={category} size="medium" />
       </div>
 
       {/* Score bar */}
       <div className="mb-4">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-medium">Priority Score</span>
-          <span className="text-2xl font-bold">{score}/255</span>
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-semibold text-[#7c4a5e]">Priority Score</span>
+          <span className="text-2xl font-bold text-[#31101e]">{score}/255</span>
         </div>
-        <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-2">
+        <div className="w-full bg-pink-100 rounded-full h-3 overflow-hidden">
           <div
-            className={`h-2 rounded-full transition-all ${
-              category === 'CRITICAL' ? 'bg-red-500' :
-              category === 'HIGH' ? 'bg-orange-500' :
-              category === 'MEDIUM' ? 'bg-yellow-500' :
-              'bg-green-500'
+            className={`h-3 rounded-full transition-all shadow-sm ${
+              category === 'CRITICAL' ? 'bg-gradient-to-r from-red-500 to-red-600' :
+              category === 'HIGH' ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+              category === 'MEDIUM' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+              'bg-gradient-to-r from-green-500 to-green-600'
             }`}
             style={{ width: `${(score / 255) * 100}%` }}
           ></div>
@@ -211,24 +205,24 @@ export const PriorityInfo = ({ priorityData, compact = false }) => {
 
       {/* Breakdown */}
       {breakdown && (
-        <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 mb-3">
-          <h4 className="text-sm font-semibold mb-2">Score Breakdown</h4>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Urgency:</span>
-              <span className="font-medium">{breakdown.urgencyScore || 0} pts</span>
+        <div className="rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 p-4 mb-3">
+          <h4 className="text-sm font-bold text-[#31101e] mb-3">Score Breakdown</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between items-center">
+              <span className="text-[#7c4a5e]">Urgency:</span>
+              <span className="font-bold text-[#ff4d6d]">{breakdown.urgencyScore || 0} pts</span>
             </div>
-            <div className="flex justify-between">
-              <span>Blood Rarity:</span>
-              <span className="font-medium">{breakdown.rarityScore || 0} pts</span>
+            <div className="flex justify-between items-center">
+              <span className="text-[#7c4a5e]">Blood Rarity:</span>
+              <span className="font-bold text-[#ff4d6d]">{breakdown.rarityScore || 0} pts</span>
             </div>
-            <div className="flex justify-between">
-              <span>Time Factor:</span>
-              <span className="font-medium">{breakdown.timeScore || 0} pts</span>
+            <div className="flex justify-between items-center">
+              <span className="text-[#7c4a5e]">Time Factor:</span>
+              <span className="font-bold text-[#ff4d6d]">{breakdown.timeScore || 0} pts</span>
             </div>
-            <div className="flex justify-between">
-              <span>Availability:</span>
-              <span className="font-medium">{breakdown.availabilityScore || 0} pts</span>
+            <div className="flex justify-between items-center">
+              <span className="text-[#7c4a5e]">Availability:</span>
+              <span className="font-bold text-[#ff4d6d]">{breakdown.availabilityScore || 0} pts</span>
             </div>
           </div>
         </div>
@@ -236,13 +230,13 @@ export const PriorityInfo = ({ priorityData, compact = false }) => {
 
       {/* Action Required */}
       {actionRequired && (
-        <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded p-2 text-sm text-amber-800 dark:text-amber-100">
+        <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-300 p-3 text-sm text-amber-900 font-semibold">
           ⚡ {actionRequired}
         </div>
       )}
 
       {/* Calculated time */}
-      <div className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+      <div className="text-xs text-[#8a5c70] mt-4 pt-3 border-t border-pink-100">
         Calculated: {new Date(calculatedAt).toLocaleString()}
       </div>
     </div>
@@ -259,47 +253,52 @@ export const PriorityLegend = () => {
       category: 'CRITICAL',
       description: 'Immediate action required',
       responseTime: '< 15 minutes',
-      examples: 'Life-threatening conditions, massive bleeding'
+      examples: 'Life-threatening conditions, massive bleeding',
+      color: '#ef4444'
     },
     {
       category: 'HIGH',
       description: 'Urgent attention needed',
       responseTime: '15-45 minutes',
-      examples: 'Severe patient condition, rare blood type in low stock'
+      examples: 'Severe patient condition, rare blood type in low stock',
+      color: '#f97316'
     },
     {
       category: 'MEDIUM',
       description: 'Standard priority',
       responseTime: '45 minutes - 2 hours',
-      examples: 'Regular surgical procedures, planned transfusions'
+      examples: 'Regular surgical procedures, planned transfusions',
+      color: '#eab308'
     },
     {
       category: 'LOW',
       description: 'Can be scheduled',
       responseTime: '2+ hours',
-      examples: 'Non-urgent transfusions, sufficient blood available'
+      examples: 'Non-urgent transfusions, sufficient blood available',
+      color: '#22c55e'
     }
   ];
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-semibold mb-4">Priority Levels</h3>
+    <div>
+      <h3 className="text-lg font-bold text-[#31101e] mb-4 pb-2 border-b border-pink-100">
+        Priority Levels
+      </h3>
       <div className="space-y-3">
         {levels.map(level => (
-          <div key={level.category} className="border-l-4 pl-3" style={{
-            borderColor: level.category === 'CRITICAL' ? '#ef4444' :
-                        level.category === 'HIGH' ? '#f97316' :
-                        level.category === 'MEDIUM' ? '#eab308' :
-                        '#22c55e'
-          }}>
-            <div className="flex items-center gap-2 mb-1">
+          <div 
+            key={level.category} 
+            className="rounded-xl border-l-4 pl-3 py-2 bg-gradient-to-r from-white to-pink-50/30" 
+            style={{ borderColor: level.color }}
+          >
+            <div className="flex items-center gap-2 mb-2">
               <PriorityBadge category={level.category} showScore={false} size="small" />
-              <span className="text-sm font-semibold">{level.description}</span>
+              <span className="text-sm font-bold text-[#31101e]">{level.description}</span>
             </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Response Time: <span className="font-medium">{level.responseTime}</span>
+            <p className="text-xs text-[#7c4a5e] mb-1">
+              Response Time: <span className="font-semibold text-[#5c283a]">{level.responseTime}</span>
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+            <p className="text-xs text-[#8a5c70]">
               Examples: {level.examples}
             </p>
           </div>

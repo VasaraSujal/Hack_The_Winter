@@ -58,6 +58,12 @@ class BloodBank {
         country: bloodBankData.address?.country || "India"
       },
       
+      // Geospatial location for nearby queries and distance calculation
+      location: bloodBankData.location || {
+        type: "Point",
+        coordinates: [0, 0] // [longitude, latitude] - should be updated with actual coordinates
+      },
+      
       // Contact Person
       contactPerson: {
         name: bloodBankData.contactPerson?.name || bloodBankData.contactPerson,
@@ -270,6 +276,34 @@ class BloodBank {
       return result.modifiedCount > 0;
     } catch (error) {
       console.error("Error updating blood bank:", error);
+      return false;
+    }
+  }
+
+  /**
+   * UPDATE - Update location coordinates
+   */
+  async updateLocation(id, longitude, latitude) {
+    const collection = this.getCollection();
+    try {
+      const result = await collection.updateOne(
+        { 
+          _id: new ObjectId(id),
+          ...this.getBloodBankQuery()
+        },
+        {
+          $set: {
+            location: {
+              type: "Point",
+              coordinates: [longitude, latitude]
+            },
+            updatedAt: new Date()
+          }
+        }
+      );
+      return result.modifiedCount > 0;
+    } catch (error) {
+      console.error("Error updating blood bank location:", error);
       return false;
     }
   }
