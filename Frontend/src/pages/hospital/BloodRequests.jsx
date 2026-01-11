@@ -30,6 +30,8 @@ const formatDate = (iso) =>
   }).format(new Date(iso));
 
 export default function HospitalBloodRequests() {
+  console.log('[BloodRequests] Component rendering...');
+  
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [urgencyFilter, setUrgencyFilter] = useState("ALL");
@@ -42,48 +44,68 @@ export default function HospitalBloodRequests() {
 
   // Get auth data from localStorage
   const token = localStorage.getItem('token');
-  const organizationId = localStorage.getItem('organizationId'); // Organization ID from login
+  const organizationId = localStorage.getItem('organizationId');
+  
+  console.log('[BloodRequests] Auth Data:', { token: token ? 'EXISTS' : 'MISSING', organizationId });
 
-  console.log('Verification Status:', verificationStatus);
-  // TEMPORARY FIX: Allow action even if not verified for debugging, or ensure strict check
-  // const actionsLocked = verificationStatus !== "VERIFIED"; 
-  const actionsLocked = false; // Force unlock for debugging
-
-  useEffect(() => {
-    fetchData();
-    
-    // Check if we should open the modal from navigation state
-    if (location.state?.openCreateModal) {
-      setIsModalOpen(true);
-      // Optional: Clear state to avoid reopening on refresh/back (requires navigate replace)
-      // but simpler to leave for now as it's a "one-off" action.
-    }
-  }, [location.state]);
+  // TEMPORARY FIX: Allow action even if not verified for debugging
+  const actionsLocked = false;
 
   const fetchData = async () => {
+    console.log('[BloodRequests] fetchData called');
+    
+    if (!token || !organizationId) {
+      console.error('[BloodRequests] Missing auth data!', { token, organizationId });
+      setError('Authentication required. Please login again.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      console.log('[BloodRequests] Fetching data for organizationId:', organizationId);
 
-      // Fetch hospital details for verification status
-      const hospitalResponse = await getHospitalById(organizationId);
-      setVerificationStatus(hospitalResponse.data.data.verificationStatus);
+      // Try to fetch hospital details for verification status (optional)
+      try {
+        console.log('[BloodRequests] Fetching hospital details...');
+        const hospitalResponse = await getHospitalById(organizationId);
+        console.log('[BloodRequests] Hospital response:', hospitalResponse.data);
+        setVerificationStatus(hospitalResponse.data.data.verificationStatus);
+      } catch (hospitalErr) {
+        console.warn('[BloodRequests] Could not fetch hospital verification status:', hospitalErr);
+      }
 
       // Fetch blood requests
+      console.log('[BloodRequests] Fetching blood requests...');
       const requestsResponse = await getHospitalBloodRequests(
         organizationId,
         { page: 1, limit: 100 },
         token
       );
 
+      console.log('[BloodRequests] Requests response:', requestsResponse.data);
       setRequests(requestsResponse.data.data || []);
       setLoading(false);
+      console.log('[BloodRequests] Data fetched successfully');
     } catch (err) {
-      console.error('Error fetching blood requests:', err);
+      console.error('[BloodRequests] Error fetching blood requests:', err);
+      console.error('[BloodRequests] Error details:', err.response?.data);
       setError(err.response?.data?.message || 'Failed to load blood requests');
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    console.log('[BloodRequests] useEffect triggered');
+    fetchData();
+    
+    // Check if we should open the modal from navigation state
+    if (location.state?.openCreateModal) {
+      setIsModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredRequests = useMemo(
     () =>
@@ -95,6 +117,8 @@ export default function HospitalBloodRequests() {
       }),
     [requests, statusFilter, urgencyFilter]
   );
+  
+  console.log('[BloodRequests] Render state:', { loading, error, requestsCount: requests.length, filteredCount: filteredRequests.length });
 
   const handleStatusUpdate = async (id, nextStatus) => {
     try {
@@ -251,7 +275,11 @@ export default function HospitalBloodRequests() {
                   }`}
                 >
                   <td className="px-6 py-4 font-bold text-gray-900">
-                    {req.bloodBankId?.name || req.bloodBankId || "Blood Bank"}
+                    {typeof req.bloodBankId === 'object' && req.bloodBankId?.name 
+                      ? req.bloodBankId.name 
+                      : typeof req.bloodBankId === 'string' 
+                        ? req.bloodBankId 
+                        : "Blood Bank"}
                   </td>
                   <td className="px-6 py-4">
                     <span className="rounded-full border-2 border-red-300 bg-red-50 px-3 py-1 text-xs font-bold text-red-800">
