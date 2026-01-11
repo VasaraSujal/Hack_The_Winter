@@ -191,8 +191,18 @@ export const getRequestsByHospital = async (req, res) => {
 // ============= GET REQUESTS BY BLOOD BANK =============
 export const getRequestsByBloodBank = async (req, res) => {
   try {
-    const { bloodBankId } = req.params;
+    let { bloodBankId } = req.params;
     const { status, urgency, bloodGroup, page = 1, limit = 20 } = req.query;
+
+    // Auto-scope by user role and organization
+    const userRole = req.user?.role || req.admin?.role;
+    const userOrgId = req.organization?.id || req.user?.organizationId;
+    const userOrgType = req.organization?.type || req.user?.organizationType;
+
+    // If user is blood bank staff, override to their organization
+    if ((userRole === 'BLOOD_BANK_STAFF' || userOrgType === 'bloodbank') && userOrgId) {
+      bloodBankId = userOrgId;
+    }
 
     const filters = {};
     if (status) filters.status = status;
@@ -209,7 +219,9 @@ export const getRequestsByBloodBank = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Blood bank requests retrieved successfully",
-      data: result
+      data: result,
+      userRole,
+      scoped: userRole === 'BLOOD_BANK_STAFF' || userOrgType === 'bloodbank'
     });
   } catch (error) {
     return res.status(500).json({
@@ -604,23 +616,45 @@ export const deleteRequest = async (req, res) => {
 
 /**
  * Get priority queue - all pending requests sorted by priority
- * Used by admin dashboard to see which requests need immediate attention
+ * Auto-scoped by user role:
+ * - Super Admin: See all requests
+ * - Blood Bank: See requests assigned to their organization
+ * - Hospital: See only their hospital's requests
+ * Also includes organization details for request source and destination
  */
 export const getPriorityQueue = async (req, res) => {
   try {
-    const { limit = 50, bloodGroup, organization } = req.query;
+    const { limit = 50, bloodGroup } = req.query;
+    const userRole = req.user?.role || req.admin?.role;
+    const userOrgId = req.organization?.id || req.user?.organizationId;
+    const userOrgType = req.organization?.type || req.user?.organizationType;
 
     const filters = {};
     if (bloodGroup) filters.bloodGroup = bloodGroup;
-    if (organization) filters.organizationId = organization;
 
-    const queue = await PriorityRequestHandler.getPriorityQueue(filters, parseInt(limit));
+    // Auto-scope based on user role
+    if (userRole === 'SUPER_ADMIN' || userRole === 'Admin') {
+      // Super Admin sees all requests - no organization filter
+    } else if (userRole === 'BLOOD_BANK_STAFF' || userOrgType === 'bloodbank') {
+      // Blood bank sees only requests assigned to them
+      filters.bloodBankId = userOrgId;
+    } else if (userRole === 'HOSPITAL_STAFF' || userOrgType === 'hospital') {
+      // Hospital sees only their own requests
+      filters.hospitalId = userOrgId;
+    } else if (userRole === 'NGO_STAFF' || userOrgType === 'ngo') {
+      // NGO sees their own requests/drives
+      filters.ngoId = userOrgId;
+    }
+
+    const queue = await PriorityRequestHandler.getPriorityQueueWithOrgInfo(filters, parseInt(limit));
 
     return res.status(200).json({
       success: true,
       message: "Priority queue retrieved successfully",
       data: {
         totalInQueue: queue.length,
+        userRole: userRole,
+        scoped: userRole !== 'SUPER_ADMIN' && userRole !== 'Admin',
         queue: queue,
         lastUpdated: new Date()
       }

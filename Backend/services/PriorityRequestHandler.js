@@ -151,6 +151,68 @@ export class PriorityRequestHandler {
   }
 
   /**
+   * Get priority queue with organization information
+   * Includes details about which organization raised request and which is assigned
+   * @param {Object} filters - Filters (hospitalId, bloodBankId, etc)
+   * @param {number} limit - Max requests to return
+   * @returns {Array} Requests with organization details
+   */
+  static async getPriorityQueueWithOrgInfo(filters = {}, limit = 100) {
+    try {
+      const db = getDB();
+      const requests = await HospitalBloodRequest.getPendingByPriority(filters);
+      const orgCollection = db.collection('organizations');
+
+      // Fetch organization details and attach to requests
+      const enrichedRequests = await Promise.all(
+        requests.slice(0, limit).map(async (req) => {
+          const hospital = req.hospitalId ? 
+            await orgCollection.findOne({ _id: new ObjectId(req.hospitalId) }) : null;
+          const bloodBank = req.bloodBankId ? 
+            await orgCollection.findOne({ _id: new ObjectId(req.bloodBankId) }) : null;
+
+          return {
+            _id: req._id,
+            requestCode: req.requestCode,
+            bloodGroup: req.bloodGroup,
+            unitsRequired: req.unitsRequired,
+            urgency: req.urgency,
+            priority: this.formatPriorityForResponse(req),
+            createdAt: req.createdAt,
+            status: req.status,
+            // Organization information
+            raisedfrom: hospital ? {
+              id: hospital._id,
+              name: hospital.name,
+              code: hospital.organizationCode,
+              type: 'Hospital',
+              location: hospital.location
+            } : null,
+            assignedTo: bloodBank ? {
+              id: bloodBank._id,
+              name: bloodBank.name,
+              code: bloodBank.organizationCode,
+              type: 'Blood Bank',
+              location: bloodBank.location
+            } : {
+              name: 'Unassigned',
+              type: 'Pending Assignment'
+            },
+            // Raw IDs for API use
+            hospitalId: req.hospitalId,
+            bloodBankId: req.bloodBankId
+          };
+        })
+      );
+
+      return enrichedRequests;
+    } catch (error) {
+      console.error("Error getting priority queue with org info:", error);
+      return [];
+    }
+  }
+
+  /**
    * Get priority dashboard statistics
    * @returns {Object} Statistics about priority distribution
    */

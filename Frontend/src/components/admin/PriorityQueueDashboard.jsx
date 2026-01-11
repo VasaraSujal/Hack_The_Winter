@@ -1,8 +1,12 @@
 /**
  * Priority Queue Dashboard
  * 
- * Displays all pending blood requests sorted by priority
- * Shows real-time queue status and priority distribution
+ * Displays pending blood requests sorted by priority
+ * Auto-scoped by user role:
+ * - Super Admin: sees ALL requests
+ * - Blood Bank: sees only requests assigned to them
+ * - Hospital: sees only their requests
+ * Shows organization details (request source and destination)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -224,14 +228,32 @@ const PriorityQueueDashboard = () => {
                       selectedRequest?._id === request._id ? 'bg-blue-50 dark:bg-blue-900' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start justify-between mb-3">
                       <div>
                         <h4 className="font-semibold text-gray-900 dark:text-white">
                           {request.requestCode}
                         </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           {request.bloodGroup} • {request.unitsRequired} units
                         </p>
+                        
+                        {/* Organization Information */}
+                        <div className="mt-2 text-xs space-y-1">
+                          {request.raisedfrom && (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-blue-600 dark:text-blue-400">From:</span>
+                              <span className="text-gray-700 dark:text-gray-300">{request.raisedfrom.name}</span>
+                            </div>
+                          )}
+                          {request.assignedTo && (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-green-600 dark:text-green-400">To:</span>
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {request.assignedTo.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <PriorityBadge
                         score={typeof request.priority === 'object' ? request.priority.score || 0 : request.priority || 0}
@@ -288,7 +310,65 @@ const PriorityQueueDashboard = () => {
                   </p>
                 </div>
 
-                <div>
+                {/* Organization Details */}
+                {selectedRequest.raisedfrom && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+                    <p className="text-gray-600 dark:text-gray-400 font-semibold mb-2">Raised From</p>
+                    <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                      <p className="font-semibold text-blue-900 dark:text-blue-200">
+                        {selectedRequest.raisedfrom.name}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Code: {selectedRequest.raisedfrom.code}
+                      </p>
+                      {selectedRequest.raisedfrom.location && (
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          📍 {selectedRequest.raisedfrom.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assigned To */}
+                {selectedRequest.assignedTo && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+                    <p className="text-gray-600 dark:text-gray-400 font-semibold mb-2">Assigned To</p>
+                    <div className={`p-2 rounded ${
+                      selectedRequest.assignedTo.type === 'Pending Assignment'
+                        ? 'bg-yellow-50 dark:bg-yellow-900/30'
+                        : 'bg-green-50 dark:bg-green-900/30'
+                    }`}>
+                      <p className={`font-semibold ${
+                        selectedRequest.assignedTo.type === 'Pending Assignment'
+                          ? 'text-yellow-900 dark:text-yellow-200'
+                          : 'text-green-900 dark:text-green-200'
+                      }`}>
+                        {selectedRequest.assignedTo.name}
+                      </p>
+                      {selectedRequest.assignedTo.code && (
+                        <p className={`text-xs ${
+                          selectedRequest.assignedTo.type === 'Pending Assignment'
+                            ? 'text-yellow-700 dark:text-yellow-300'
+                            : 'text-green-700 dark:text-green-300'
+                        }`}>
+                          Code: {selectedRequest.assignedTo.code}
+                        </p>
+                      )}
+                      {selectedRequest.assignedTo.location && (
+                        <p className={`text-xs ${
+                          selectedRequest.assignedTo.type === 'Pending Assignment'
+                            ? 'text-yellow-700 dark:text-yellow-300'
+                            : 'text-green-700 dark:text-green-300'
+                        }`}>
+                          📍 {selectedRequest.assignedTo.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
                   <p className="text-gray-600 dark:text-gray-400">Created</p>
                   <p className="font-semibold text-gray-900 dark:text-white">
                     {new Date(selectedRequest.createdAt).toLocaleString()}
