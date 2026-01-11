@@ -2,6 +2,11 @@ import HospitalBloodRequest from "../../models/hospital/HospitalBloodRequest.js"
 import UrgencyCalculator from "../../utils/UrgencyCalculator.js";
 import PriorityRequestHandler from "../../services/PriorityRequestHandler.js";
 import bloodStockModel from "../../models/admin/BloodStock.js";
+import DistanceCalculator from "../../utils/DistanceCalculator.js";
+import Hospital from "../../models/hospital/Hospital.js";
+import BloodBank from "../../models/admin/BloodBank.js";
+import { getDB } from "../../config/db.js";
+import { ObjectId } from "mongodb";
 
 export class HospitalBloodRequestController {
     // ============= REQUEST CRUD =============
@@ -355,22 +360,138 @@ export class HospitalBloodRequestController {
             const { id } = req.params;
             const { bloodBankResponse } = req.body;
 
+            // First, fetch the request to get hospital and blood bank IDs
+            const request = await HospitalBloodRequest.findById(id);
+
+            if (!request) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Blood request not found"
+                });
+            }
+
+            if (request.status !== "PENDING") {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot accept request with status: ${request.status}. Only PENDING requests can be accepted.`
+                });
+            }
+
+            // Fetch hospital details
+            console.log('Fetching hospital with ID:', request.hospitalId.toString());
+            let hospital = await Hospital.findById(request.hospitalId.toString());
+            
+            // Fallback: If not found in hospitals collection, try organizations collection
+            if (!hospital) {
+                console.log('Hospital not found in "hospitals" collection, trying "organizations"...');
+                const db = getDB();
+                hospital = await db.collection('organizations').findOne({
+                    _id: new ObjectId(request.hospitalId.toString()),
+                    type: 'hospital'
+                });
+                
+                if (hospital) {
+                    console.log('✅ Hospital found in "organizations" collection:', hospital.name);
+                }
+            } else {
+                console.log('✅ Hospital found in "hospitals" collection:', hospital.name);
+            }
+            
+            if (!hospital) {
+                console.error('❌ Hospital not found in any collection');
+                console.error('Request hospitalId:', request.hospitalId);
+                console.error('Searched in: hospitals, organizations');
+                
+                return res.status(404).json({
+                    success: false,
+                    message: "Hospital not found in database. Please ensure hospital is properly registered.",
+                    debug: {
+                        hospitalId: request.hospitalId.toString(),
+                        requestId: request._id.toString(),
+                        searchedCollections: ['hospitals', 'organizations']
+                    }
+                });
+            }
+
+            // Fetch blood bank details
+            const bloodBank = await BloodBank.findById(request.bloodBankId.toString());
+            if (!bloodBank) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Blood Bank not found"
+                });
+            }
+
+            // Calculate distance between hospital and blood bank
+            let distanceInfo = null;
+            let distanceError = null;
+
+            try {
+                // Check if both have valid location coordinates
+                if (hospital.location && bloodBank.location) {
+                    const distance = DistanceCalculator.calculateDistance(
+                        hospital.location,
+                        bloodBank.location
+                    );
+
+                    distanceInfo = {
+                        distance: distance,
+                        formatted: DistanceCalculator.formatDistance(distance),
+                        category: DistanceCalculator.getDistanceCategory(distance.kilometers),
+                        hospitalLocation: {
+                            name: hospital.name,
+                            address: hospital.address,
+                            coordinates: hospital.location.coordinates
+                        },
+                        bloodBankLocation: {
+                            name: bloodBank.name,
+                            address: bloodBank.address,
+                            coordinates: bloodBank.location?.coordinates || null
+                        }
+                    };
+                } else {
+                    distanceError = "Location coordinates not available for one or both organizations";
+                }
+            } catch (error) {
+                console.error("Error calculating distance:", error);
+                distanceError = error.message;
+            }
+
+            // Accept the request
             const success = await HospitalBloodRequest.acceptRequest(id, bloodBankResponse || "");
 
             if (!success) {
-                return res.status(404).json({
+                return res.status(500).json({
                     success: false,
-                    message: "Blood request not found or already processed"
+                    message: "Failed to accept blood request"
                 });
             }
 
             // Fetch the updated request
-            const request = await HospitalBloodRequest.findById(id);
+            const updatedRequest = await HospitalBloodRequest.findById(id);
 
             res.status(200).json({
                 success: true,
-                message: "Blood request accepted",
-                data: request
+                message: "Blood request accepted successfully",
+                data: updatedRequest,
+                distanceInfo: distanceInfo,
+                distanceError: distanceError,
+                hospitalDetails: {
+                    _id: hospital._id,
+                    name: hospital.name,
+                    hospitalCode: hospital.hospitalCode,
+                    address: hospital.address,
+                    phone: hospital.phone,
+                    location: hospital.location
+                },
+                bloodBankDetails: {
+                    _id: bloodBank._id,
+                    name: bloodBank.name,
+                    organizationCode: bloodBank.organizationCode,
+                    address: bloodBank.address,
+                    phone: bloodBank.phone,
+                    location: bloodBank.location
+                }
             });
         } catch (error) {
             console.error("Error accepting blood request:", error);
