@@ -1,8 +1,10 @@
-# ROUND2_ROADMAP
-## Smart Emergency Blood Network (SEBN)
+# Round 2 (The SlingShot): Smart Emergency Blood Network (SEBN) - The Slingshot
 
-This document outlines the planned improvements and additions for Round 2 of the SEBN project.
-The roadmap focuses on deepening functionality, improving reliability, and strengthening governance, rather than expanding scope prematurely.
+> This document outlines planned enhancements for Round 2 of SEBN, focusing on operational maturity and reliability.
+
+**Round 2 - The Slingshot** focuses on strengthening reliability, decision support, governance, and operational clarity, building directly on the validated foundation from Round 1.
+
+No new problem domain or emergency type is introduced in this phase.
 
 ---
 
@@ -140,23 +142,29 @@ graph TB
     style E4 fill:#1b5e20,stroke:#003300,stroke-width:2px,color:#fff
 ```
 
-### 3.1 Intelligent Emergency Prioritization
+### 3.1 Priority-Based Request Support
 
 **What will be added**
 
-Dynamic prioritization of blood requests based on:
-
+System-assisted prioritization of blood requests based on:
 - Urgency level
-- Blood rarity
-- Time since request
-- Availability trends
+- Blood group rarity
+- Time since request creation
+
+Priority visibility for:
+- Super Admin
+- Blood Banks
+- Hospital staff (to understand queue position)
 
 **Why**
+- Helps stakeholders focus on critical cases
+- Provides transparency into request handling
+- Reduces uncertainty during emergencies
 
-- Not all emergencies are equal
-- Helps admins and blood banks focus on the most critical cases first
-
-**Implementation Flow**
+**How it works**
+- System calculates and displays priority scores
+- Staff make informed decisions based on prioritized queue
+- Admins can review prioritization logic and override if needed
 
 ```mermaid
 graph LR
@@ -178,21 +186,28 @@ graph LR
     style Search fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
 ```
 
-### 3.2 Advanced Radius Escalation Logic
+### 3.2 System-Assisted Escalation Logic
 
 **What will be improved**
 
-- Configurable radius expansion rules
-- Time-based escalation thresholds
-- Organization-specific escalation policies
+- System recommendations for radius expansion (when blood not found in initial radius)
+- Manual confirmation required before escalating
+- Clear visibility into escalation triggers and reasoning
+- Configurable escalation policies per organization
 
 **Why**
 
 - Prevents unnecessary broad searches
-- Reduces donor fatigue
-- Improves system efficiency
+- Maintains human oversight in sensitive decisions
+- Reduces donor fatigue from over-escalation
+- Improves search efficiency
 
-**Escalation Strategy**
+**How it works**
+
+- System detects when initial search yields no results
+- Recommends next escalation step to authorized staff
+- Staff confirms or adjusts escalation decision
+- All decisions logged for audit trail
 
 ```mermaid
 flowchart TD
@@ -232,24 +247,31 @@ flowchart TD
     style Result fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
 ```
 
-### 3.3 Automated Notification & Escalation System
+### 3.3 Structured Notification & Status Updates
 
 **What will be added**
 
-Automated alerts to:
+Notifications at key lifecycle stages:
+- Request created (acknowledgment)
+- Escalation recommended (with reasoning)
+- Escalation confirmed (status update)
+- Resolution or unresolved (final status)
 
-- Blood banks
-- NGOs
-- Super Admins
-
-Multi-stage escalation notifications for delayed responses
+Delivery methods:
+- In-app alerts with full context
+- Dashboard status indicators
+- Clear timestamps and action trails
 
 **Why**
 
-- Reduces dependency on manual follow-ups
-- Ensures timely response during critical emergencies
+- Reduces need for manual status checks
+- Keeps all stakeholders informed at critical moments
+- Provides clear audit trail of communication
 
-**Notification Pipeline**
+**Principle**
+- Notifications inform, they don't command
+- Human staff remain in control of escalation decisions
+- Every notification includes reasoning and options
 
 ```mermaid
 graph TB
@@ -262,17 +284,16 @@ graph TB
         Stage4["Stage 4: 1 hour delay<br/>Critical Alert"]
     end
     
-    Notify1["📱 Send Notification"]
-    Notify2["📧 Email + SMS"]
+    Notify1["📱 In-App Notification"]
     Notify3["🔔 Dashboard Alert"]
     
     Event --> Stage1
     Stage1 --> Notify1
     
     Notify1 -->|Wait 10 min| Stage2
-    Stage2 --> Notify2
+    Stage2 --> Notify3
     
-    Notify2 -->|Wait 20 min| Stage3
+    Notify3 -->|Wait 20 min| Stage3
     Stage3 --> Notify3
     
     Notify3 -->|Wait 30 min| Stage4
@@ -288,23 +309,28 @@ graph TB
     style Notify3 fill:#6a1b9a,stroke:#4a148c,stroke-width:2px,color:#fff
 ```
 
-### 3.4 Operational Dashboards & Analytics
+### 3.4 Admin Operational Dashboard
 
 **What will be added**
 
-Admin-level analytics dashboards showing:
-
-- Emergency resolution times
-- Blood stock trends
-- NGO donor participation rates
-- Organization activity metrics
+Admin interface showing:
+- Current request queue and status
+- Resolution times (average and by organization)
+- Escalation frequency and patterns
+- Organization activity overview
+- Recent audit log entries
 
 **Why**
 
-- Enables data-driven decisions
-- Improves system transparency and oversight
+- Enables data-informed decision making
+- Improves system transparency
+- Helps identify bottlenecks and patterns
 
-**Analytics Dashboard Components**
+**Scope**
+- Real-time operational metrics (not predictive analytics)
+- Historical trends within reasonable data retention
+- Filtered views per organization/role
+- No AI/ML or advanced prediction models
 
 ```mermaid
 graph TB
@@ -349,19 +375,21 @@ graph TB
 
 ## 4. Technical Improvements (Round 2)
 
-### 4.1 Performance Optimization
+### 4.1 Performance Readiness
 
-- Query optimization for emergency searches
-- Indexing strategies for high-traffic collections
-- Reduced response latency during peak usage
+- Database query optimization for high-traffic searches
+- Proper indexing on blood group, location, availability fields
+- Pagination to prevent large result sets
+- Rate limiting to prevent abuse during peak load
 
-### 4.2 Reliability Enhancements
+### 4.2 Reliability Improvements
 
-- Better error handling and fallback strategies
-- Improved rate limiting and request validation
-- Graceful handling of partial system failures
+- Graceful error handling with clear user feedback
+- Fallback workflows when primary search fails
+- Partial failure handling (e.g., one blood bank unavailable doesn't break system)
+- API timeout and retry logic
 
-### Technical Stack Improvements
+**Note**: These are design-level improvements, not infrastructure scaling claims. Actual deployment scaling decisions will be made based on real usage patterns.
 
 ```mermaid
 graph TB
@@ -386,19 +414,24 @@ graph TB
 
 ---
 
-## 5. Security & Access Control Enhancements
+## 5. Security & Access Control Refinement
 
 **Planned Improvements**
 
-- Finer-grained role permissions
-- Action-level access validation
-- Enhanced monitoring for misuse or abuse patterns
+- Action-level permission validation (not just role checks)
+- Organization boundary enforcement (data isolation)
+- Audit logging for all administrative actions
+- Monitoring for unusual patterns (manual review, not automated blocking)
 
-**Goal**
+**Goal**: Maintain trust in a multi-organization environment through transparency and controlled access.
 
-- Maintain trust in a multi-organization environment
+**What this does NOT include**:
+- Automated threat detection
+- Real-time security scoring
+- Advanced compliance certifications
+- Enterprise security frameworks
 
-### Enhanced Security Model
+These may be considered after the core system proves stable in production.
 
 ```mermaid
 graph TD
@@ -453,87 +486,102 @@ These may be considered only after core stability is achieved.
 
 ---
 
-## 7. Round 2 Overview
+## 7. Hackathon Progression Overview
 
-Round 2 focuses on strengthening the reliability, responsiveness, and administrative clarity of the SEBN platform.
+### Round 1 Deliverables (Foundation)
 
-### Round 2 Implementation Timeline
+**✅ Completed Components**:
+- Governed organization onboarding and approval workflow
+- Role-based access control (Super Admin, Organization Admin, Staff)
+- Emergency blood request processing flow
+- Blood bank stock management system
+- NGO donor and camp management
+- Complete audit logging and tracking
+- Core data models and API infrastructure
 
-```mermaid
-timeline
-    title Round 2 Development Timeline (3-4 Months)
-    
-    Phase 1: Month 1 : Intelligent Prioritization : Advanced Escalation : Initial Dashboards
-    Phase 2: Month 2 : Auto Notifications : Performance Tuning : Audit Enhancements
-    Phase 3: Month 2-3 : Analytics Dashboard : Security Hardening : Beta Testing
-    Phase 4: Month 3-4 : Production Release : Documentation : User Training
-```
-
-### Core Focus Areas
-
-```mermaid
-graph TB
-    Round2["🎯 ROUND 2 GOALS"]
-    
-    Round2 --> Speed["⚡ Faster Resolution<br/>Smart prioritization"]
-    Round2 --> Auto["🤖 Automate Workflows<br/>Smart notifications"]
-    Round2 --> Clarity["📊 Better Clarity<br/>Rich analytics"]
-    Round2 --> Safety["🔒 Enhanced Safety<br/>Stronger security"]
-    Round2 --> Reliability["✅ Greater Reliability<br/>Performance tuned"]
-    
-    style Round2 fill:#1a0f2e,stroke:#000,stroke-width:2px,color:#fff
-    style Speed fill:#c62828,stroke:#ad1457,stroke-width:2px,color:#fff
-    style Auto fill:#e65100,stroke:#bf360c,stroke-width:2px,color:#fff
-    style Clarity fill:#1565c0,stroke:#0d47a1,stroke-width:2px,color:#fff
-    style Safety fill:#004d40,stroke:#00332e,stroke-width:2px,color:#fff
-    style Reliability fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-```
-
-The primary intent of this phase is to:
-- Improve how quickly emergency requests move toward resolution
-- Ensure unresolved cases escalate automatically and visibly
-- Reduce administrative delays in organization approvals
-- Make system activity and trends clearer to administrators
-
-These improvements aim to enhance operational effectiveness without expanding the system's scope beyond blood emergency management.
+**Outcome**: Validated proof-of-concept with core workflows functioning
 
 ---
 
-## 8. Success Metrics for Round 2
+### Round 2 Deliverables (The Slingshot - Operational Maturity)
 
-```mermaid
-graph LR
-    Current["ROUND 1<br/>Baseline"]
-    
-    Target1["Resolution Time<br/>< 20 min"] 
-    Target2["Notification<br/>Auto Rate > 90%"]
-    Target3["Admin Insights<br/>Real-time"]
-    Target4["Security Score<br/>A+ Grade"]
-    Target5["System Uptime<br/>99.5%"]
-    
-    Current --> Target1
-    Current --> Target2
-    Current --> Target3
-    Current --> Target4
-    Current --> Target5
-    
-    style Current fill:#1565c0,stroke:#0d47a1,stroke-width:2px,color:#fff
-    style Target1 fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-    style Target2 fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-    style Target3 fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-    style Target4 fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-    style Target5 fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
-```
+**🟡 In Development - Key Enhancements**:
+1. **Priority-Based Request Support**
+   - System-assisted prioritization (urgency, rarity, time)
+   - Queue visibility for all stakeholders
+   - Admin override capabilities
+
+2. **System-Assisted Escalation Logic**
+   - Multi-stage radius expansion (5KM → 15KM → 50KM)
+   - Manual confirmation required for each escalation
+   - Escalation reasoning and audit trail
+
+3. **Structured Notifications & Status Updates**
+   - In-app alerts at critical lifecycle stages
+   - Dashboard status indicators
+   - Complete communication audit trail
+
+4. **Admin Operational Dashboard**
+   - Real-time request queue and status visibility
+   - Resolution time metrics and patterns
+   - Escalation frequency analysis
+   - Organization activity overview
+
+5. **Strengthened Audit & Compliance Layer**
+   - Enhanced audit logging with action categorization
+   - Advanced filtering and search capabilities
+   - Compliance-ready audit trails
+
+6. **Performance & Reliability Improvements**
+   - Database query optimization and proper indexing
+   - Graceful error handling with fallback workflows
+   - API timeout and retry logic
+   - Rate limiting and load handling
+
 
 ---
+
+---
+
+## 8. Round 2 Overview & Closure
+
+Round 2 focuses on strengthening the operational clarity and reliability of SEBN without expanding its original scope.
+
+The work in this phase centers on:
+- Making emergency request handling more structured through visible prioritization.
+- Supporting escalation decisions with system recommendations while keeping humans in control.
+- Improving transparency through clearer request status, history, and audit visibility.
+- Ensuring core workflows remain stable as usage increases.
+
+This phase does not aim to introduce new emergency domains or advanced automation.  
+Instead, it emphasizes clarity, governance, and controlled coordination for real-world blood emergency scenarios.
+
+### Explicit Focus Boundaries
+
+To avoid over-extension, the following are intentionally not addressed in Round 2:
+- Nationwide deployment readiness
+- Autonomous or AI-driven decision-making
+- Predictive or forecasting systems
+- Formal security certifications
+- Replacement of existing government healthcare platforms
+
+Round 2 serves as a consolidation phase, ensuring that the system’s behavior, decisions, and data flows are understandable, traceable, and reliable before any future expansion is considered.
+
 
 ## 9. Conclusion
 
-Overall, Round 2 focuses on refining coordination, improving responsiveness, and strengthening administrative clarity on top of the existing Round 1 foundation.
+Round 2 transitions SEBN from **proof-of-concept design** to **operationally mature system** suitable for real-world blood emergency coordination.
 
-By focusing on these enhancements, SEBN will transition from a proof-of-concept system to a production-ready platform capable of handling real-world emergency blood coordination at scale.
+**Focus remains on:**
+- Blood emergency management only (no scope expansion)
+- System-assisted decision making (humans in control)
+- Reliability and transparency (not autonomous automation)
+- Accountability and auditability (full decision trails)
+- Realistic scaling (based on actual usage, not theoretical claims)
 
-► **Round 2 Vision**: A faster, smarter, more reliable emergency blood network
+### Round 2 Vision
+
+**A faster, safer, and more transparent emergency blood coordination platform where system intelligence supports human decision-making.**
 
 
 
