@@ -28,6 +28,19 @@ const startServer = async () => {
       `);
     });
 
+    // Handle unhandled promise rejections
+    process.on("unhandledRejection", (reason, promise) => {
+      console.error("⚠️  Unhandled Promise Rejection:", reason);
+      console.error("Promise:", promise);
+      // Don't exit the process, just log the error
+    });
+
+    // Handle uncaught exceptions
+    process.on("uncaughtException", (error) => {
+      console.error("⚠️  Uncaught Exception:", error);
+      // Don't exit the process, just log the error
+    });
+
     // Graceful shutdown
     process.on("SIGINT", async () => {
       console.log("\n🛑 Shutting down gracefully...");
