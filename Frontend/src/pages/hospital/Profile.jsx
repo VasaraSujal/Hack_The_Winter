@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { getHospitalById, updateHospital } from "../../services/hospitalApi";
 import { jsPDF } from "jspdf";
+import { useAuth } from "../../context/AuthContext";
 
 export default function HospitalProfile() {
+  const { user } = useAuth();
   const [hospital, setHospital] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,24 +14,39 @@ export default function HospitalProfile() {
   const [formData, setFormData] = useState({});
   const [updating, setUpdating] = useState(false);
 
-  // Get organizationId from localStorage
-  const organizationId = localStorage.getItem('organizationId');
+  // Get organizationId from localStorage or user context
+  const organizationId = localStorage.getItem('organizationId') || user?.organizationId;
   const token = localStorage.getItem('token');
 
   useEffect(() => {
+    console.log('[PROFILE] Component mounted');
+    console.log('[PROFILE] organizationId:', organizationId);
+    console.log('[PROFILE] token:', token ? 'Present' : 'Missing');
+    
+    if (!organizationId) {
+      console.error('[PROFILE] No organizationId found in localStorage');
+      setError('Organization ID not found. Please log in again.');
+      setLoading(false);
+      return;
+    }
+    
     fetchHospitalProfile();
-  }, []);
+  }, [organizationId]);
 
   const fetchHospitalProfile = async () => {
     try {
       setLoading(true);
       setError(null);
-
+      
+      console.log('[PROFILE] Fetching hospital data for ID:', organizationId);
       const response = await getHospitalById(organizationId);
+      console.log('[PROFILE] Hospital data received:', response.data);
+      
       setHospital(response.data.data);
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching hospital profile:', err);
+      console.error('[PROFILE] Error fetching hospital profile:', err);
+      console.error('[PROFILE] Error response:', err.response?.data);
       setError(err.response?.data?.message || 'Failed to load hospital profile');
       setLoading(false);
     }
@@ -50,10 +67,13 @@ export default function HospitalProfile() {
     setFormData({
       name: hospital.name,
       phone: hospital.phone,
-      address: hospital.location?.address || hospital.address || "",
-      city: hospital.location?.city || hospital.city || "",
-      state: hospital.location?.state || "",
-      pincode: hospital.location?.pincode || "",
+      address: hospital.location?.address || hospital.address?.street || 
+               (typeof hospital.address === 'object' 
+                 ? `${hospital.address.street || ''}, ${hospital.address.city || ''}, ${hospital.address.state || ''} ${hospital.address.pinCode || ''}`.trim()
+                 : hospital.address || ""),
+      city: hospital.location?.city || hospital.address?.city || hospital.city || "",
+      state: hospital.location?.state || hospital.address?.state || "",
+      pincode: hospital.location?.pincode || hospital.address?.pinCode || "",
       registrationNumber: hospital.registrationNumber, // Usually read-only but shown
     });
     setIsEditModalOpen(true);
@@ -380,8 +400,11 @@ export default function HospitalProfile() {
     addBullet(`Name: ${hospital.name}`);
     addBullet(`Email: ${hospital.email}`);
     addBullet(`Phone: ${hospital.phone}`);
-    addBullet(`Address: ${hospital.location?.address || hospital.address}`);
-    addBullet(`City: ${hospital.location?.city || hospital.city}`);
+    addBullet(`Address: ${hospital.location?.address || hospital.address?.street || 
+               (typeof hospital.address === 'object' 
+                 ? `${hospital.address.street || ''}, ${hospital.address.city || ''}, ${hospital.address.state || ''} ${hospital.address.pinCode || ''}`.trim()
+                 : hospital.address || 'N/A')}`);
+    addBullet(`City: ${hospital.location?.city || hospital.address?.city || hospital.city || 'N/A'}`);
 
     // Footer with box
     checkPageBreak(25);
@@ -533,7 +556,13 @@ export default function HospitalProfile() {
         <p className="text-xs uppercase tracking-[0.3em] text-[#b05f09]">
           Facility Footprint
         </p>
-        <p className="mt-3 text-sm text-[#6a3a3a]">{hospital.location?.address || hospital.address}</p>
+        <p className="mt-3 text-sm text-[#6a3a3a]">
+          {hospital.location?.address || 
+           hospital.address?.street || 
+           (typeof hospital.address === 'object' 
+             ? `${hospital.address.street || ''}, ${hospital.address.city || ''}, ${hospital.address.state || ''} ${hospital.address.pinCode || ''}`.trim()
+             : hospital.address || 'N/A')}
+        </p>
         
         <div className="mt-3 grid grid-cols-3 gap-4 text-xs">
           {hospital.location?.city && (

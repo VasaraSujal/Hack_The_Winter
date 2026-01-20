@@ -1,8 +1,8 @@
 import axios from "axios";
 
 // Base URL handling similar to other services
-const API_URL = "http://localhost:5000/api/resource-requests";
-const BLOOD_BANK_API_URL = "http://localhost:5000/api/blood-banks";
+const API_URL = `${import.meta.env.VITE_API_URL}/resource-requests`;
+const BLOOD_BANK_API_URL = `${import.meta.env.VITE_API_URL}/blood-banks`;
 
 // Helper to get auth header
 const getAuthHeader = () => {

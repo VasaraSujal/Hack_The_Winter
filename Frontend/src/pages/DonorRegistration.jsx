@@ -36,7 +36,7 @@ export default function DonorRegistration() {
   useEffect(() => {
     const fetchCamps = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/public/camps");
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/public/camps`);
         if (response.data.success && response.data.camps) {
           setCamps(response.data.camps);
         }
@@ -62,7 +62,7 @@ export default function DonorRegistration() {
       setSlotsLoading(true);
       try {
         const response = await axios.get(
-          `http://localhost:5000/api/public/camps/${selectedCamp._id}/slots`
+          `${import.meta.env.VITE_API_URL}/public/camps/${selectedCamp._id}/slots`
         );
         if (response.data.success && response.data.slots) {
           setSlots(response.data.slots);
@@ -163,7 +163,7 @@ export default function DonorRegistration() {
       const nextDonationDate = new Date(formData.donationDate);
       nextDonationDate.setDate(nextDonationDate.getDate() + 90);
 
-      const response = await axios.post("http://localhost:5000/api/donor/register", {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/donor/register`, {
         name: formData.name,
         age: parseInt(formData.age),
         gender: formData.gender,
