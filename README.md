@@ -400,7 +400,9 @@ SEBN replaces fragmented and manual blood search processes with a **trusted, aut
 
 | Resource | Link |
 |----------|------|
-| **Demo** | [View Demo Video](https://drive.google.com/drive/folders/1splVdZoQxYmd0r-DX-u-tqTPUxqSP3fD?usp=sharing) |
+| **Frontend Deployment** | [hackthewinter.netlify.app](https://hackthewinter.netlify.app/) |
+| **Backend Deployment** | [hack-the-winter.onrender.com](https://hack-the-winter.onrender.com) |
+| **Demo Video** | [View Demo Video](https://drive.google.com/drive/folders/1splVdZoQxYmd0r-DX-u-tqTPUxqSP3fD?usp=sharing) |
 | **Postman (Admin)** | [API Documentation](https://documenter.getpostman.com/view/39216723/2sBXVbJuPe) |
 | **Postman (Hospital)** | [API Documentation](https://documenter.getpostman.com/view/39215245/2sBXVbJuTv) |
 | **Postman (Blood Bank)** | [API Documentation](https://documenter.getpostman.com/view/39189509/2sBXVfiBEH) |
